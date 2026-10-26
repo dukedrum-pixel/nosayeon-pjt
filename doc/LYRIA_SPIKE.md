@@ -10,6 +10,8 @@
 - 새 Cloud 작업에서 Secret `ready`, 네트워크 정책 `enforced` 확인. 네트워크 명령에는 실행 도구의 명시적 네트워크 접근 권한이 필요했다.
 - 기존 `PROJECT_HANDOFF.md`는 원본 인계 기록으로 보존한다.
 
+후속으로 생성 기능을 제공하지 않는 조회 전용 클라이언트와 `restore:verify` CLI를 추가했다. 실제 Google 재조회 오디오와 DB의 최초 파일 메타데이터·원본 해시가 일치했다. [재신청 준비 기록](RESTORE_PREPARATION.md)을 참고한다. 이 검증도 50일 보관을 보장하지 않는다.
+
 ## 실제 검증 결과 (2026-10-26 23:06 KST)
 
 - 기준 코드: `codex/lyria-recovery-spike`, `8d34a2f`.

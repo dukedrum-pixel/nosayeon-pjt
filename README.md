@@ -9,6 +9,7 @@
 - [결과 링크 토큰 검증·실제 음원 조회](doc/RESULT_ACCESS.md)
 - [1회 다운로드·파일 삭제·실패 복구](doc/DOWNLOAD_POLICY.md)
 - [7일 만료 자동 정리·스케줄 운영](doc/EXPIRY_CLEANUP.md)
+- [동일 음악 재신청 준비·조회 전용 복구 검증](doc/RESTORE_PREPARATION.md)
 
 ```sh
 npm ci       # 전체 테스트를 위한 개발 의존성 설치

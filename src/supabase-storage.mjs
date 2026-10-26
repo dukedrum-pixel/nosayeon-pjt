@@ -64,6 +64,12 @@ export function createStorageBackend({ url, serviceRoleKey, fetchImpl = globalTh
     return `/storage/v1/object/${BUCKET}/${path}`;
   }
   return {
+    song: async id => {
+      if (!/^[0-9a-f-]{36}$/.test(id)) throw new StorageError('local_error');
+      const rows = await jsonRequest(`/rest/v1/songs?id=eq.${id}&select=id,google_interaction_id,model,generated_at,storage_status&limit=1`);
+      if (!Array.isArray(rows) || rows.length !== 1) throw new StorageError('invalid_response');
+      return rows[0];
+    },
     cleanupCandidates: () => jsonRequest('/rest/v1/rpc/list_result_cleanup_candidates', { method: 'POST', json: { p_limit: 20 } }),
     authorizeCleanupJob: hash => jsonRequest('/rest/v1/rpc/authorize_audio_cleanup_job', { method: 'POST', json: { p_token_hash: hash } }),
     recordCleanupRun: async summary => {
