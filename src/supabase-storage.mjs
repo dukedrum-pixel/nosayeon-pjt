@@ -64,6 +64,18 @@ export function createStorageBackend({ url, serviceRoleKey, fetchImpl = globalTh
     return `/storage/v1/object/${BUCKET}/${path}`;
   }
   return {
+    adminDashboard: () => jsonRequest('/rest/v1/rpc/read_admin_dashboard', { method: 'POST', json: {} }),
+    adminSongs: (offset, id) => {
+      if (!Number.isInteger(offset) || offset < 0 || offset > 9999999 || (id !== null && !/^[0-9a-f-]{36}$/.test(id))) throw new StorageError('local_error');
+      return jsonRequest(`/rest/v1/songs?select=id,generated_at,created_at,generation_status,storage_status,last_error_code,song_files(file_index,mime_type,byte_length,sha256),song_result_links(delivery_version,expires_at,consumed_at,revoked_at,restore_status,notification_status)&order=created_at.desc,id.desc&limit=21&offset=${offset}${id ? `&id=eq.${id}` : ''}`);
+    },
+    adminHistory: () => jsonRequest('/rest/v1/admin_delivery_exports?select=id,song_id,file_index,channel,status,created_at,error_code&order=created_at.desc,id.desc&limit=50'),
+    beginAdminEmail: (id, index, hash, length, recipient, sender, operationId) => jsonRequest('/rest/v1/rpc/begin_admin_email', { method: 'POST',
+      json: { p_song_id: id, p_file_index: index, p_sha256: hash, p_byte_length: length, p_recipient: recipient, p_sender: sender, p_operation_id: operationId } }),
+    finishAdminEmail: (id, status, messageId, code) => jsonRequest('/rest/v1/rpc/finish_admin_email', { method: 'POST',
+      json: { p_id: id, p_status: status, p_message_id: messageId, p_error_code: code } }),
+    prepareAdminDelivery: (id, index, hash, length, channel) => jsonRequest('/rest/v1/rpc/prepare_admin_delivery', { method: 'POST',
+      json: { p_song_id: id, p_file_index: index, p_sha256: hash, p_byte_length: length, p_channel: channel } }),
     song: async id => {
       if (!/^[0-9a-f-]{36}$/.test(id)) throw new StorageError('local_error');
       const rows = await jsonRequest(`/rest/v1/songs?id=eq.${id}&select=id,google_interaction_id,model,generated_at,storage_status&limit=1`);

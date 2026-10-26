@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="referrer" content="no-referrer"><title>운영 관리 · 노사연</title>
+  <link rel="stylesheet" href="/admin.css"><script type="module" src="/js/admin.mjs"></script>
+</head>
+<body>
+  <header class="topbar"><a class="brand" href="/">노사연<span>운영 관리</span></a><div><span class="local">내부 운영 도구</span><button id="logout" hidden>로그아웃</button></div></header>
+  <main>
+    <section id="login" class="login panel">
+      <span class="eyebrow">ADMIN ACCESS</span><h1>관리자 로그인</h1><p>관리자 전용 인증으로 운영 현황을 확인하세요.</p>
+      <form id="login-form"><label for="access-token">관리자 인증 토큰</label><input id="access-token" type="password" autocomplete="off" spellcheck="false" required minlength="43" maxlength="128"><button class="primary" type="submit">로그인</button></form>
+      <label class="file-label" for="credential">또는 로컬 인증 파일 선택<input id="credential" type="file" accept="application/json,.json"></label>
+      <p class="muted">서버가 발급한 access.json을 사용할 수 있습니다. Supabase 서비스 키를 입력하지 마세요.</p>
+    </section>
+    <p id="message" role="status" aria-live="polite"></p>
+    <div id="workspace" hidden>
+      <section class="page-heading"><div><span class="eyebrow">OPERATIONS</span><h1>음악 전달을 한눈에</h1><p id="observed">운영 현황을 불러오는 중입니다.</p></div><button id="refresh">새로고침 ↻</button></section>
+      <section class="metrics" aria-label="운영 지표">
+        <article class="panel metric"><span>음악 요청 · 등록된 건</span><strong id="requests">—</strong><small>생성 후 DB에 등록된 요청 기준</small></article>
+        <article class="panel metric"><span>음악 생성 완료</span><strong id="generated">—</strong><small>최초 생성 완료가 기록된 음악</small></article>
+        <article class="panel metric"><span>현재 저장 완료</span><strong id="stored">—</strong><small id="failures">저장·복구 상태 확인 중</small></article>
+        <article class="panel metric"><span>재신청 누적</span><strong id="reissues">—</strong><small id="restoring">복구 진행 상태 확인 중</small></article>
+      </section>
+      <p class="scope">집계 범위: 현재 DB에는 생성 완료 후 등록된 음악이 기록됩니다. 생성 전 신청 수와 생성 실패 수는 요청 접수 시스템 연결 후 집계됩니다.</p>
+      <section class="capacity-grid" aria-label="용량 및 연동 상태">
+        <article class="panel capacity"><span class="eyebrow">DATABASE</span><h2>DB 용량</h2><strong id="db-used">—</strong><p id="db-remaining">남은 용량 확인 중</p><progress id="db-meter" max="100" value="0" hidden></progress><small>현재 DB의 데이터·인덱스 크기입니다. WAL·시스템 파일은 포함하지 않습니다.</small></article>
+        <article class="panel capacity"><span class="eyebrow">FILE STORAGE</span><h2>파일 저장 용량</h2><strong id="storage-used">—</strong><p id="storage-remaining">남은 용량 확인 중</p><progress id="storage-meter" max="100" value="0" hidden></progress><small id="audio-used">음악 파일 용량 확인 중</small></article>
+        <article class="panel integrations"><span class="eyebrow">CONNECTIONS</span><h2>서비스 연결</h2><dl><div><dt>이메일 발송</dt><dd id="email-connection">가계정 연결 준비</dd></div><div><dt>카카오 발송</dt><dd>추후 연결</dd></div><div><dt>Google Drive 백업</dt><dd>추후 제작</dd></div><div><dt>결제 · 환불</dt><dd>추후 구축</dd></div></dl><small id="notification-count">안내 대기 건수 확인 중</small></article>
+      </section>
+      <section class="panel songs-panel">
+        <div class="section-heading"><div><h2>음악 목록</h2><p>백업 MP3를 직접 전달할 음악을 선택하세요.</p></div><form id="search-form"><label class="sr-only" for="search-id">곡 ID 검색</label><input id="search-id" placeholder="곡 ID로 검색" autocomplete="off"><button type="submit">검색</button><button id="clear-search" type="button">전체</button></form></div>
+        <p class="table-hint">표를 좌우로 움직이면 직접 전달 버튼을 볼 수 있습니다.</p><div class="table-wrap"><table><thead><tr><th>곡 ID / 최초 생성</th><th>보관 상태</th><th>다운로드 상태</th><th>원본 파일</th><th>직접 전달</th></tr></thead><tbody id="songs"></tbody></table></div>
+        <div class="pagination"><button id="previous">이전</button><span id="page-number">1 페이지</span><button id="next">다음</button></div>
+      </section>
+      <section class="panel delivery" id="delivery" hidden>
+        <div class="section-heading"><div><span class="eyebrow">MANUAL DELIVERY</span><h2>백업 MP3 직접 전달 준비</h2><p id="selected-song"></p></div><button id="close-delivery">닫기</button></div>
+        <p class="notice">선택한 백업 파일을 원본 해시와 비교합니다. 고객 다운로드 권한을 바꾸거나 기존 파일을 삭제하지 않습니다. 최초 생성 후 50일 이내의 MP3만 준비할 수 있습니다.</p>
+        <form id="prepare-form"><div class="form-grid"><label>원본 파일<select id="file-index"></select></label><label>전달 채널<select id="channel"><option value="email">이메일 · 파일 첨부</option><option value="kakao" disabled>카카오 · 추후 연결</option></select></label></div><label>보관 중인 백업 MP3<input id="backup-file" type="file" accept=".mp3,audio/mpeg,audio/mp3" required></label><p id="expected-file" class="muted mono"></p><label class="recipient-label">받는 사람 이메일<input id="recipient" type="email" autocomplete="off" maxlength="254" placeholder="고객 이메일 주소"></label><p id="email-setup" class="muted"></p><button id="send-email" type="button" disabled>MP3 첨부 메일 발송</button> <button id="prepare-button" class="primary" type="submit">원본 검증 후 MP3 준비</button></form>
+        <div id="prepared" class="prepared" hidden><strong>원본과 일치하는 MP3입니다.</strong><p>파일을 내려받아 메일에 첨부해 주세요. 현재 페이지에서 메일이 자동 발송되지는 않습니다.</p><a id="prepared-download" class="button primary">검증된 MP3 내려받기</a><p id="preparation-reference" class="muted mono"></p></div>
+      </section>
+      <section class="panel history-panel"><div class="section-heading"><div><h2>직접 전달 이력</h2><p>파일 준비와 Gmail 접수 상태를 구분합니다. Gmail 접수는 고객 수신 완료를 뜻하지 않습니다.</p></div><span id="manual-count" class="pill">—</span></div><div class="table-wrap"><table><thead><tr><th>준비 시각</th><th>곡 ID</th><th>파일 / 채널</th><th>상태</th></tr></thead><tbody id="history"></tbody></table></div></section>
+      <footer>노사연 운영 관리 · 저장소와 파일 상태는 새로고침 시 다시 조회합니다.</footer>
+    </div>
+  </main>
+</body>
+</html>
