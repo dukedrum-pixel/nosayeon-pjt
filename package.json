@@ -5,6 +5,7 @@
   "type": "module",
   "engines": { "node": ">=24.5.0" },
   "scripts": {
+    "dev": "python3 -m http.server 4173 --bind 127.0.0.1 --directory web",
     "spike": "node --use-env-proxy scripts/lyria-spike.mjs",
     "test": "node --test --test-isolation=none"
   }
