@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto';
+import { googleJson, validAccessToken, verifyGoogleSender } from './gmail-auth.mjs';
 
 // Deliberately accepts one plain address, never a list or a display-name header.
 export const validEmail = value => typeof value === 'string' && value.length <= 254
@@ -10,35 +11,28 @@ export class GmailDeliveryError extends Error {
   constructor(state, code) { super(code); this.state = state; this.code = code; }
 }
 
-async function smallJson(response) {
-  const chunks = []; let length = 0;
-  if (!response.body) throw new Error('invalid_response');
-  for await (const chunk of response.body) {
-    length += chunk.length;
-    if (length > 16384) throw new Error('invalid_response');
-    chunks.push(chunk);
-  }
-  return JSON.parse(Buffer.concat(chunks).toString('utf8'));
-}
-
 export function createGmailDelivery({ sender, clientId, clientSecret, refreshToken, fetchImpl = fetch, timeoutMs = 30000 }) {
   if (!validEmail(sender) || !clientId || !clientSecret || !refreshToken || !Number.isInteger(timeoutMs) || timeoutMs < 1000 || timeoutMs > 60000) throw new Error('invalid_mail_configuration');
+  async function authenticate() {
+    try {
+      // OAuth credentials are sent only to Google's token endpoint. No retries.
+      const response = await fetchImpl('https://oauth2.googleapis.com/token', { method: 'POST', redirect: 'error',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({ client_id: clientId, client_secret: clientSecret, refresh_token: refreshToken, grant_type: 'refresh_token' }),
+        signal: AbortSignal.timeout(timeoutMs) });
+      if (!response.ok) { await response.body?.cancel(); throw new Error('oauth_failed'); }
+      const data = await googleJson(response);
+      if (!validAccessToken(data.access_token)) throw new Error('oauth_failed');
+      await verifyGoogleSender({ accessToken: data.access_token, sender, fetchImpl, timeoutMs });
+      return data.access_token;
+    } catch { throw new GmailDeliveryError('failed', 'mail_auth_failed'); }
+  }
   return {
     sender,
+    async checkConnection() { await authenticate(); return { sender, status: 'verified' }; },
     async send({ recipient, bytes, operationId }) {
       if (!validEmail(recipient) || !bytes?.length || bytes.length > EMAIL_AUDIO_LIMIT || !/^[a-f0-9-]{36}$/.test(operationId)) throw new GmailDeliveryError('failed', 'invalid_mail');
-      let accessToken;
-      try {
-        // OAuth credentials are sent only to Google's token endpoint. No retries.
-        const response = await fetchImpl('https://oauth2.googleapis.com/token', { method: 'POST', redirect: 'error',
-          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-          body: new URLSearchParams({ client_id: clientId, client_secret: clientSecret, refresh_token: refreshToken, grant_type: 'refresh_token' }),
-          signal: AbortSignal.timeout(timeoutMs) });
-        if (!response.ok) { await response.body?.cancel(); throw new Error('oauth_failed'); }
-        const data = await smallJson(response);
-        if (typeof data.access_token !== 'string' || !/^[A-Za-z0-9._~-]{1,8192}$/.test(data.access_token)) throw new Error('oauth_failed');
-        accessToken = data.access_token;
-      } catch { throw new GmailDeliveryError('failed', 'mail_auth_failed'); }
+      const accessToken = await authenticate();
       const boundary = `nosayeon_${randomUUID()}`;
       const base64 = data => Buffer.from(data).toString('base64').match(/.{1,76}/g).join('\r\n');
       const subject = Buffer.from('[노사연] 요청하신 음악 MP3를 보내드립니다.').toString('base64');
@@ -62,7 +56,7 @@ export function createGmailDelivery({ sender, clientId, clientSecret, refreshTok
           await response.body?.cancel();
           throw new GmailDeliveryError(response.status >= 400 && response.status < 500 && response.status !== 408 ? 'failed' : 'unknown', 'mail_rejected');
         }
-        const data = await smallJson(response);
+        const data = await googleJson(response);
         if (typeof data.id !== 'string' || !/^[A-Za-z0-9_-]{1,128}$/.test(data.id)) throw new Error('invalid_response');
         return { providerMessageId: data.id };
       } catch (error) {

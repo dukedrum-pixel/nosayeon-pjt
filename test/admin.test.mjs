@@ -79,15 +79,16 @@ test('발송 결과가 불명확하면 unknown 이력으로 남기고 오류 원
   assert.equal(response.status, 503); assert.equal((await response.json()).error, 'mail_result_unknown'); assert.equal(jobs.get(id), 'unknown');
 });
 
-test('Gmail MIME에 MP3 원본을 첨부하고 토큰을 정확한 두 Google 호스트에만 전달한다', async () => {
+test('Gmail MIME에 MP3 원본을 첨부하고 토큰을 정확한 Google 호스트에만 전달한다', async () => {
   const calls = [];
   const client = createGmailDelivery({ sender: 'peter@humansyntax.kr', clientId: 'CLIENT', clientSecret: 'SECRET', refreshToken: 'REFRESH',
-    fetchImpl: async (url, options) => { calls.push({ url, options }); return Response.json(calls.length === 1 ? { access_token: 'ACCESS' } : { id: 'message123' }); } });
+    fetchImpl: async (url, options) => { calls.push({ url, options }); return Response.json(calls.length === 1 ? { access_token: 'ACCESS' } : calls.length === 2 ? { email: 'peter@humansyntax.kr', email_verified: true } : { id: 'message123' }); } });
   assert.deepEqual(await client.send({ recipient: 'customer@example.com', bytes, operationId: id }), { providerMessageId: 'message123' });
-  assert.equal(calls.length, 2); assert.equal(calls[0].url, 'https://oauth2.googleapis.com/token');
-  assert.equal(calls[1].url, 'https://gmail.googleapis.com/gmail/v1/users/me/messages/send');
-  assert.equal(calls[1].options.headers.Authorization, 'Bearer ACCESS');
-  const mime = Buffer.from(JSON.parse(calls[1].options.body).raw, 'base64url').toString();
+  assert.equal(calls.length, 3); assert.equal(calls[0].url, 'https://oauth2.googleapis.com/token');
+  assert.equal(calls[1].url, 'https://openidconnect.googleapis.com/v1/userinfo');
+  assert.equal(calls[2].url, 'https://gmail.googleapis.com/gmail/v1/users/me/messages/send');
+  assert.equal(calls[2].options.headers.Authorization, 'Bearer ACCESS');
+  const mime = Buffer.from(JSON.parse(calls[2].options.body).raw, 'base64url').toString();
   assert.match(mime, /To: customer@example.com\r\n/); assert.match(mime, /From: peter@humansyntax.kr\r\n/);
   const attachment = mime.split('Content-Disposition: attachment; filename="nosayeon.mp3"\r\nContent-Transfer-Encoding: base64\r\n\r\n')[1].split('\r\n--')[0];
   assert.equal(await sha256(Buffer.from(attachment, 'base64')), hash);
@@ -100,11 +101,12 @@ test('Gmail 토큰 발급 실패는 failed, 발송 POST 타임아웃·서버 오
     const client = createGmailDelivery({ sender: 'sender@example.com', clientId: 'c', clientSecret: 's', refreshToken: 'r', fetchImpl: async () => {
       calls++;
       if (calls === 1) return scenario === 'oauth' ? new Response('PRIVATE', { status: 401 }) : Response.json({ access_token: 'token' });
+      if (calls === 2) return Response.json({ email: 'sender@example.com', email_verified: true });
       if (scenario === 'timeout') throw new Error('PRIVATE');
       return scenario === 'bad_json' ? new Response('PRIVATE') : new Response('PRIVATE', { status: scenario === 'reject' ? 403 : 503 });
     } });
     await assert.rejects(client.send({ recipient: 'customer@example.com', bytes, operationId: id }), error => error.state === (['oauth', 'reject'].includes(scenario) ? 'failed' : 'unknown') && !error.message.includes('PRIVATE'));
-    assert.equal(calls, scenario === 'oauth' ? 1 : 2);
+    assert.equal(calls, scenario === 'oauth' ? 1 : 3);
   }
 });
 

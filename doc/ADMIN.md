@@ -45,9 +45,9 @@ DB 크기는 `pg_database_size(current_database())`이며 WAL·시스템 파일�
 초기 발신 주소는 사용자가 지정한 `peter@humansyntax.kr`이다. 현재 환경에는 Gmail 앱 전용 인증이 없어 실제 발송은 비활성이다. ChatGPT의 Gmail 연결은 이 서비스 서버의 OAuth 인증을 대신하지 않는다. 실제 계정 로그인이 없으므로 발신 주소에 대한 소유·송신 권한도 아직 실검증하지 않았다.
 
 1. Google Cloud 프로젝트에서 Gmail API를 활성화하고 OAuth 클라이언트와 동의 화면을 준비한다.
-2. 해당 가계정으로 OAuth 동의를 완료한다. 최소 권한 `https://www.googleapis.com/auth/gmail.send`와 offline access를 사용해 refresh token을 받는다. 메일 읽기·삭제·Drive 권한은 요청하지 않는다. 내부 Workspace 앱 설정 가능 여부와 관리자의 앱 허용 정책을 확인한다. 외부 Testing 앱은 refresh token 만료 제한이 있으므로 서비스 운영 전에 게시 상태·검증 요구를 확인한다.
-3. 서버 Secret에 아래 값을 설정한다. 채팅·Git에 붙여 넣지 않는다. `GMAIL_CLIENT_SECRET`, `GMAIL_REFRESH_TOKEN`의 허용 도메인은 `oauth2.googleapis.com`으로 제한하고, 네트워크에는 `oauth2.googleapis.com`, `gmail.googleapis.com`을 허용한다. 발급된 단기 access token만 Gmail 호스트에 보낸다.
-4. 서버 재시작 후 인증 설정 여부가 표시된다. 실제 연결과 발송은 지정한 테스트 수신처에 직접 발송해 별도로 확인한다. 키가 존재하는 것만으로 발송 성공을 표시하지 않는다.
+2. 해당 가계정으로 OAuth 동의를 완료한다. `https://www.googleapis.com/auth/gmail.send`와 계정 이메일 확인용 `openid email`, offline access를 사용해 refresh token을 받는다. 메일 읽기·삭제·Drive 권한은 요청하지 않는다. 내부 Workspace 앱 설정 가능 여부와 관리자의 앱 허용 정책을 확인한다. 외부 Testing 앱은 refresh token 만료 제한이 있으므로 서비스 운영 전에 게시 상태·검증 요구를 확인한다.
+3. 서버 Secret에 아래 값을 설정한다. 채팅·Git에 붙여 넣지 않는다. `GMAIL_CLIENT_SECRET`, `GMAIL_REFRESH_TOKEN`의 허용 도메인은 `oauth2.googleapis.com`으로 제한하고, 네트워크에는 `oauth2.googleapis.com`, `openidconnect.googleapis.com`, `gmail.googleapis.com`을 허용한다. 발급된 단기 access token만 Gmail 호스트에 보낸다.
+4. [Gmail 최초 연결 순서](GMAIL_SETUP.md)의 로컬 PKCE 연결 도구와 `gmail:check`로 토큰 갱신·발신 계정 일치를 먼저 확인한다. 서버 재시작 후 인증 설정 여부가 표시된다. 실제 연결과 발송은 지정한 테스트 수신처에 직접 발송해 별도로 확인한다. 키가 존재하는 것만으로 발송 성공을 표시하지 않는다.
 
 | 설정 | 내용 |
 | --- | --- |
@@ -55,6 +55,8 @@ DB 크기는 `pg_database_size(current_database())`이며 WAL·시스템 파일�
 | `GMAIL_CLIENT_SECRET` | 해당 OAuth 클라이언트 Secret |
 | `GMAIL_REFRESH_TOKEN` | 발신 계정이 동의한 offline refresh token |
 | `GMAIL_SENDER` | 초기 `peter@humansyntax.kr`; 본계정 전환 시 교체 |
+
+로컬에서는 `GMAIL_CREDENTIALS_FILE`로 본인 전용 인증 파일을 지정할 수도 있다. OAuth 환경변수 세 항목과는 혼합하지 않는다. 파일의 발신 주소와 다른 `GMAIL_SENDER`는 거부한다. 메일 발송 직전에 Google 계정 이메일을 확인하고 일치하지 않으면 발송을 차단한다.
 
 본계정 전환은 새 계정의 OAuth 동의를 받고 인증값·발신 주소를 함께 교체한다. 다른 계정 토큰을 유지한 채 발신 문자열만 바꾸지 않는다. 비밀번호나 Gemini API 키로 Gmail 발송을 인증하지 않는다. 세 OAuth 설정 중 일부만 있으면 잘못된 설정으로 서버 시작을 중단한다.
 

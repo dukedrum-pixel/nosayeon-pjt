@@ -5,6 +5,7 @@ import { cleanupConsumedSong } from '../src/result-cleanup.mjs';
 import { createGoogleRestoreClient } from '../src/lyria-restore.mjs';
 import { createAdminHandler } from '../src/admin-access.mjs';
 import { createGmailDelivery } from '../src/gmail-delivery.mjs';
+import { loadGmailConfiguration } from '../src/gmail-auth.mjs';
 import { randomBytes } from 'node:crypto';
 import { mkdir, writeFile } from 'node:fs/promises';
 
@@ -19,10 +20,9 @@ try {
     console.log('로컬 관리자 인증 파일: artifacts/admin/access.json (서버 재시작 시 교체, 값은 출력하지 않습니다.)');
   }
   const capacity = name => process.env[name] ? Number(process.env[name]) : null;
-  const gmailConfig = [process.env.GMAIL_CLIENT_ID, process.env.GMAIL_CLIENT_SECRET, process.env.GMAIL_REFRESH_TOKEN];
-  if (gmailConfig.some(Boolean) && !gmailConfig.every(Boolean)) throw new Error('incomplete_mail_configuration');
-  const sender = process.env.GMAIL_SENDER || 'peter@humansyntax.kr';
-  const mailer = gmailConfig.every(Boolean) ? createGmailDelivery({ sender, clientId: gmailConfig[0], clientSecret: gmailConfig[1], refreshToken: gmailConfig[2] }) : undefined;
+  const gmailConfig = await loadGmailConfiguration();
+  const sender = gmailConfig?.sender || process.env.GMAIL_SENDER || 'peter@humansyntax.kr';
+  const mailer = gmailConfig ? createGmailDelivery(gmailConfig) : undefined;
   const adminHandler = createAdminHandler({ backend, accessToken: adminToken, mailer, sender,
     databaseCapacityBytes: capacity('ADMIN_DATABASE_CAPACITY_BYTES'), storageCapacityBytes: capacity('ADMIN_STORAGE_CAPACITY_BYTES') });
   const server = createResultServer({ handler: createResultHandler({ backend,restoreClient }),
