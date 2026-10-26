@@ -23,7 +23,7 @@ test('PostgreSQL 마이그레이션과 저장 재개를 실제 SQL 엔진으로 
       create table storage.buckets(id text primary key, name text, public boolean,
         file_size_limit bigint, allowed_mime_types text[]);
     `);
-    const migration = await readFile(new URL('../supabase/migrations/20261026150000_private_audio_storage.sql', import.meta.url), 'utf8');
+    const migration = await readFile(new URL('../supabase/migrations/20261026143658_private_audio_storage.sql', import.meta.url), 'utf8');
     await t.test('공개 버킷 이름 충돌 시 마이그레이션 전체 롤백', async () => {
       await db.exec(`insert into storage.buckets(id, public) values ('nosayeon-audio', true)`);
       await assert.rejects(db.exec(migration), /incompatible settings/);

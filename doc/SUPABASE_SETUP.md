@@ -2,7 +2,7 @@
 
 ## 현재 상태
 
-DB 마이그레이션, 서버 전용 Storage REST 어댑터, 기존 Lyria 검증 결과의 저장 CLI를 구현했다. **실제 Supabase 프로젝트는 아직 생성·연결되지 않았고 원격 마이그레이션과 업로드도 미실행**이다. 정적 테스트 페이지에는 서비스 키나 저장 API를 연결하지 않았다.
+DB 마이그레이션, 서버 전용 Storage REST 어댑터, 기존 Lyria 검증 결과의 저장 CLI를 구현했다. **서울 리전의 실제 `nosayeon-pjt` 프로젝트에 마이그레이션 적용·DB 동작 검증 완료. 실제 파일 업로드는 Cloud Network secret 설정 대기 중**이다. 정적 테스트 페이지에는 서비스 키나 저장 API를 연결하지 않았다.
 
 이번 단계는 이미 생성된 음악을 최초 저장하는 단계다. 새 음악 생성, Google 재조회, 링크 발급, 파일 만료·삭제, 다운로드 권한 소진, 이메일, 공개 Edge Function은 실행하지 않는다. 제품 정책 미확정 항목은 변경하지 않았다.
 
@@ -11,13 +11,13 @@ DB 마이그레이션, 서버 전용 Storage REST 어댑터, 기존 Lyria 검증
 1. [Supabase Dashboard](https://supabase.com/dashboard)에서 무료 조직의 **New project**를 선택한다.
 2. 이름은 `nosayeon-pjt`, 지역은 가능하면 Seoul을 선택한다. DB 비밀번호를 생성해 비밀번호 관리자에 보관한다. 채팅이나 Git에 넣지 않는다.
 3. 프로젝트가 준비되면 Supabase 플러그인을 설치하고 해당 계정을 연결한다. 소유자가 사용할 프로젝트를 지정한 뒤 그 프로젝트에만 마이그레이션을 적용한다.
-4. `supabase/migrations/20261026150000_private_audio_storage.sql`을 하나의 마이그레이션으로 적용한다. 파일은 트랜잭션으로 묶여 있다. 새 전용 프로젝트용이며 기존 `songs` 테이블 등이 있으면 중단하므로 검토 없이 삭제하거나 덮어쓰지 않는다.
+4. 새 프로젝트에서만 `supabase/migrations/20261026143658_private_audio_storage.sql`을 하나의 마이그레이션으로 적용한다. **현재 노사연 프로젝트에는 이미 적용했으므로 반복 실행하지 않는다.** 파일은 트랜잭션으로 묶여 있다. 기존 `songs` 테이블 등이 있으면 중단하므로 검토 없이 삭제하거나 덮어쓰지 않는다.
 
 DB 적용 후 실제 파일 저장 CLI를 실행하려면 아래 런타임 설정도 필요하다. 키 값을 채팅으로 전달하지 않는다.
 
 | 설정 | 넣을 값 | 위치 |
 | --- | --- | --- |
-| `SUPABASE_URL` | `https://<project-ref>.supabase.co` | 서버/CLI 환경변수 |
+| `SUPABASE_URL` | `https://fuvgpqkyhuyanbfavwcg.supabase.co` | 실행 명령에서 지정 가능. 별도 Secret 등록 불필요 |
 | `SUPABASE_SERVICE_ROLE_KEY` | 해당 프로젝트의 서버 전용 `service_role` 키 | Cloud Network secret |
 | Network secret 허용 도메인 | `<project-ref>.supabase.co`만 | Secret 바인딩 설정 |
 | 네트워크 허용 호스트 | `<project-ref>.supabase.co` | Cloud 네트워크 설정 |
@@ -25,6 +25,8 @@ DB 적용 후 실제 파일 저장 CLI를 실행하려면 아래 런타임 설�
 `service_role`은 Supabase 프로젝트 설정의 API Keys에서 legacy 키로 제공될 수 있다. 공개용 `anon`/publishable 키와 구분한다. 값은 소스·브라우저·채팅에 넣지 않는다. 이 CLI 어댑터는 표준 Supabase 프로젝트 도메인만 허용하며 로컬·커스텀 도메인 및 새 형식의 키는 이번 단계에서 실연동 검증하지 않았다.
 
 설정 게시 후 현재 작업에서 Secret `ready`, 네트워크 `enforced` 및 실제 연결을 확인한다. Secret 바인딩과 네트워크 허용은 별도다. 실행 도구의 명시적 네트워크 접근 권한도 사용해야 한다. 프로젝트 URL과 키가 서로 같은 프로젝트를 가리켜야 한다.
+
+사용자 설정 경로: Supabase Dashboard → 프로젝트 → Settings → API Keys → Legacy API Keys → `service_role`. Codex Cloud 환경 편집 → Network secret에 `SUPABASE_SERVICE_ROLE_KEY`로 저장하고, Secret 허용 도메인과 네트워크 허용 호스트 모두에 `fuvgpqkyhuyanbfavwcg.supabase.co`를 추가해 게시한다. 기존 Google 설정은 유지한다.
 
 ## DB 구조와 접근 제어
 
@@ -74,8 +76,21 @@ DB와 오브젝트 저장은 하나의 트랜잭션이 아니므로, 실패 시 
 
 ## 검증 결과와 실제 연결 후 확인할 것
 
+### 실제 프로젝트 DB 검증 (2026-10-26 23:37 KST)
+
+- 프로젝트 `nosayeon-pjt`, ref `fuvgpqkyhuyanbfavwcg`, 서울 `ap-northeast-2`, PostgreSQL 17.11. 기존 `public` 테이블과 Storage 정책이 비어 있는 것을 확인한 뒤 적용했다.
+- 원격 마이그레이션 이력: `20261026143658 / private_audio_storage`. 저장소 파일명을 동일 버전으로 맞춰 재적용을 방지했다. 마이그레이션 SQL 내용은 기존 검증본과 동일하다.
+- `songs`, `song_files`, `song_events`: RLS 활성화, `anon` 및 `authenticated`의 읽기·쓰기 권한 없음.
+- 네 RPC: `SECURITY INVOKER`, `anon`/`authenticated` 실행 불가, `service_role` 실행 가능.
+- `nosayeon-audio`: `public=false`, 파일당 64MiB, 허용 MIME 3종 확인.
+- 실제 DB의 `service_role`로 중복 등록, 중복 점유 차단, 저장 실패 기록 후 재개·완료를 검증했다. 테스트 트랜잭션 전체 롤백 후 세 테이블의 행 수 모두 0임을 확인했다. 파일 업로드를 수행한 검증은 아니다.
+- Advisors 보안·성능 점검에 ERROR/WARN 없음. [RLS 정책 없음 안내](https://supabase.com/docs/guides/database/database-linter?lint=0008_rls_enabled_no_policy)는 서버 전용 접근 설계에 따른 INFO 3건이며, 공개 정책을 추가하지 않았다. [미사용 인덱스 안내](https://supabase.com/docs/guides/database/database-linter?lint=0005_unused_index)는 아직 실데이터가 없어 발생한 INFO 2건이다.
+- Cloud 환경에는 아직 Supabase 서버 키가 없다. 원격 파일 업로드·읽기 해시 비교 및 익명 Storage 접근의 실제 HTTP 검증은 대기 중이다.
+
+### 로컬 검증
+
 - `npm test`: 29개 통과. PGlite PostgreSQL WASM 엔진에서 실제 마이그레이션, 트랜잭션 롤백, RLS·함수 권한, 중복 등록, 점유권 교체, 부분 저장 재개, 원격 해시 불일치를 검증했다. 테스트용 Storage 카탈로그와 메모리 오브젝트를 사용하며 실제 Supabase API는 아니다.
 - REST 어댑터는 모의 HTTP로 인증 헤더·호스트 제한·덮어쓰기 금지·예외 정제·재시도 없음을 확인했다.
 - 실제 MP3 1개(3,021,074바이트)의 로컬 저장 준비 검사 통과. DB·Storage·음악 생성 API 호출 없음.
-- 실제 연결 후에는 원격 마이그레이션, RLS/버킷 설정, 원본 업로드 후 읽기 해시 일치, 동일 폴더 재실행 시 중복 없음, 익명 Storage 접근 차단을 추가로 확인해야 한다.
+- 실제 파일 연결 후에는 원본 업로드 후 읽기 해시 일치, 동일 폴더 재실행 시 중복 없음, 익명 Storage 접근 차단을 추가로 확인해야 한다. DB 마이그레이션과 DB 측 접근 제한은 위와 같이 확인했다.
 - Edge Function 배포, 결과 링크, 만료·다운로드·복구·메일 및 50일 보관 검증은 후속 단계다. 웹 테스트 페이지의 CSP와 네트워크 미연결 상태를 유지했다.
