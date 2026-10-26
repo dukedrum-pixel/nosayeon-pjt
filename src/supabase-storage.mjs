@@ -63,6 +63,16 @@ export function createStorageBackend({ url, serviceRoleKey, fetchImpl = globalTh
     return `/storage/v1/object/${BUCKET}/${path}`;
   }
   return {
+    issueResultLink: (id, tokenHash) => {
+      if (!/^[0-9a-f-]{36}$/.test(id) || !/^[0-9a-f]{64}$/.test(tokenHash)) throw new StorageError('local_error');
+      return jsonRequest('/rest/v1/rpc/issue_initial_result_link', { method: 'POST', json: { p_song_id: id, p_token_hash: tokenHash } });
+    },
+    resultLink: async (id, tokenHash) => {
+      if (!/^[0-9a-f-]{36}$/.test(id) || !/^[0-9a-f]{64}$/.test(tokenHash)) throw new StorageError('local_error');
+      const rows = await jsonRequest(`/rest/v1/song_result_links?song_id=eq.${id}&token_hash=eq.${tokenHash}&select=song_id,issued_at,expires_at,revoked_at,songs!inner(storage_status)&limit=1`);
+      if (!Array.isArray(rows)) throw new StorageError('invalid_response');
+      return rows[0] ?? null;
+    },
     register: args => jsonRequest('/rest/v1/rpc/register_generated_song', { method: 'POST', json: args }),
     claim: id => jsonRequest('/rest/v1/rpc/claim_song_storage', { method: 'POST', json: { p_song_id: id } }),
     files: id => {

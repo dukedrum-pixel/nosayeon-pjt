@@ -4,39 +4,28 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="referrer" content="no-referrer">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; connect-src 'none'; media-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'">
-  <title>노사연 · 결과 화면 미리보기</title>
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; connect-src 'self'; media-src blob:; object-src 'none'; base-uri 'none'; form-action 'none'">
+  <title>노사연 · 당신의 노래</title>
   <link rel="stylesheet" href="styles.css">
-  <script type="module" src="js/result-preview.mjs"></script>
+  <script type="module" src="js/result-page.mjs"></script>
 </head>
 <body>
-  <header class="topbar"><a class="brand" href="./">노사연<span>사연을 노래로</span></a><span class="badge">결과 화면 미리보기</span></header>
+  <header class="topbar"><a class="brand" href="./">노사연<span>사연을 노래로</span></a><span class="badge">내부 연결 검증</span></header>
   <main class="result-layout">
     <section class="intro"><p class="eyebrow">YOUR STORY, YOUR SONG</p><h1>사연이 담긴<br>당신의 노래.</h1><p>소중한 마음을 오래 간직할 수 있도록.</p></section>
-    <section class="card" aria-labelledby="preview-heading">
-      <h2 id="preview-heading">상태별 화면 확인</h2>
-      <p class="hint">예시 데이터로 화면을 확인합니다. 실제 결과 링크가 아니며 음악 재생·다운로드·재신청은 실행하지 않습니다.</p>
-      <label for="result-scenario">확인할 상태</label>
-      <select id="result-scenario">
-        <option value="available">사용 가능</option>
-        <option value="consumed">다운로드 사용 완료</option>
-        <option value="expired">7일 만료</option>
-        <option value="retention_ended">보관기간 종료</option>
-        <option value="processing">준비 중</option>
-        <option value="invalid_link" selected>유효하지 않은 링크</option>
-        <option value="error">조회 오류</option>
-      </select>
-      <label class="result-checkbox"><input id="restore-eligible" type="checkbox"> 서버가 재신청을 허용한 경우</label>
-    </section>
     <section class="card result-card" aria-labelledby="result-heading">
       <div role="status" aria-live="polite" aria-atomic="true"><h2 id="result-heading">결과 링크를 확인해 주세요</h2><p id="result-message">유효한 결과 링크로 다시 접속해 주세요.</p></div>
       <p id="result-expiry" class="hint" hidden></p>
-      <div id="result-playback" hidden><label for="result-audio">당신의 노래</label><audio id="result-audio" controls preload="none" aria-describedby="preview-actions-hint"></audio><p class="hint">음악 재생만으로 다운로드 횟수를 사용하지 않습니다.</p></div>
-      <button id="result-download" class="primary" type="button" disabled hidden>노래 다운로드</button>
-      <button id="result-restore" class="secondary" type="button" disabled hidden>다운로드 링크 다시 신청</button>
-      <p id="preview-actions-hint" class="hint">미리보기에서는 재생할 음원과 버튼 동작을 연결하지 않았습니다.</p>
+      <div id="result-playback" hidden>
+        <label for="result-file">재생할 음원</label><select id="result-file"></select>
+        <button id="result-play" class="secondary" type="button">노래 불러오기</button>
+        <audio id="result-audio" controls preload="none" controlslist="nodownload" aria-describedby="playback-hint"></audio>
+        <p id="playback-hint" class="hint">음악 재생만으로 다운로드 횟수를 사용하지 않습니다.</p>
+      </div>
+      <button id="result-download" class="primary" type="button" disabled hidden>노래 다운로드 · 준비 중</button>
+      <p class="hint">내부 검증 단계입니다. 다운로드·재신청·이메일 기능은 아직 제공하지 않습니다.</p>
     </section>
-    <noscript><p class="notice">상태별 화면을 확인하려면 JavaScript를 활성화해 주세요.</p></noscript>
+    <noscript><p class="notice">결과를 확인하려면 JavaScript를 활성화해 주세요.</p></noscript>
   </main>
   <footer>노사연 · 소중한 사연을, 오래 남을 노래로.</footer>
 </body>

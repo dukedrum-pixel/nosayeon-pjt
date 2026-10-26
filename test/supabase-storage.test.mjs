@@ -7,6 +7,21 @@ const serviceRoleKey = 'private-test-key';
 const id = '11111111-1111-4111-8111-111111111111';
 const path = `${id}/original/1-${'a'.repeat(64)}.mp3`;
 
+test('결과 링크 어댑터는 해시만 전달하고 읽기 응답을 검증한다', async () => {
+  const calls = [];
+  const backend = createStorageBackend({ url, serviceRoleKey, fetchImpl: async (target, options) => {
+    calls.push({ target, options });
+    return new Response(target.pathname.includes('/rpc/') ? '{}' : '[{"song_id":"test"}]');
+  } });
+  const hash = 'b'.repeat(64);
+  await backend.issueResultLink(id, hash);
+  assert.deepEqual(JSON.parse(calls[0].options.body), { p_song_id: id, p_token_hash: hash });
+  assert.equal((await backend.resultLink(id, hash)).song_id, 'test');
+  assert.equal(calls[1].target.searchParams.get('token_hash'), `eq.${hash}`);
+  await assert.rejects(backend.resultLink(id, 'raw-token'), /local_error/);
+  assert.equal(calls.length, 2);
+});
+
 test('서버 키는 지정 프로젝트에만 보내고 업로드는 덮어쓰기·자동 재시도 없음', async () => {
   const calls = [];
   const backend = createStorageBackend({ url, serviceRoleKey, fetchImpl: async (target, options) => {

@@ -10,6 +10,8 @@
     "dev": "python3 -m http.server 4173 --bind 127.0.0.1 --directory web",
     "spike": "node --use-env-proxy scripts/lyria-spike.mjs",
     "storage:import": "node --use-env-proxy scripts/import-spike.mjs",
+    "result:serve": "node --use-env-proxy scripts/result-server.mjs",
+    "result:issue": "node --use-env-proxy scripts/issue-result-link.mjs",
     "test": "node --test --test-isolation=none"
   },
   "devDependencies": {
