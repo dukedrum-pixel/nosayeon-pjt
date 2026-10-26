@@ -17,7 +17,8 @@ async function readLimited(response, limit) {
   return bytes;
 }
 
-export function createStorageBackend({ url, serviceRoleKey, fetchImpl = globalThis.fetch }) {
+export function createStorageBackend({ url, serviceRoleKey, fetchImpl = globalThis.fetch, timeoutMs = 60000 }) {
+  if (!Number.isInteger(timeoutMs) || timeoutMs < 1000 || timeoutMs > 60000) throw new StorageError('local_error');
   let base;
   try { base = new URL(url); } catch { throw new StorageError('local_error'); }
   // Only a standard project origin may receive this backend credential.
@@ -34,7 +35,7 @@ export function createStorageBackend({ url, serviceRoleKey, fetchImpl = globalTh
           ...(bytes ? { 'Content-Type': mime, 'x-upsert': 'false' } : {}),
         },
         ...(json ? { body: JSON.stringify(json) } : {}), ...(bytes ? { body: bytes } : {}),
-        redirect: 'error', signal: AbortSignal.timeout(60_000),
+        redirect: 'error', signal: AbortSignal.timeout(timeoutMs),
       });
       if (!response.ok) {
         // Some Storage versions return HTTP 400 with a structured 404 for a
@@ -63,6 +64,12 @@ export function createStorageBackend({ url, serviceRoleKey, fetchImpl = globalTh
     return `/storage/v1/object/${BUCKET}/${path}`;
   }
   return {
+    cleanupCandidates: () => jsonRequest('/rest/v1/rpc/list_result_cleanup_candidates', { method: 'POST', json: { p_limit: 20 } }),
+    authorizeCleanupJob: hash => jsonRequest('/rest/v1/rpc/authorize_audio_cleanup_job', { method: 'POST', json: { p_token_hash: hash } }),
+    recordCleanupRun: async summary => {
+      const response = await request('/rest/v1/rpc/record_audio_cleanup_run', { method: 'POST', json: { p_summary: summary } });
+      await response.body?.cancel();
+    },
     issueResultLink: (id, tokenHash) => {
       if (!/^[0-9a-f-]{36}$/.test(id) || !/^[0-9a-f]{64}$/.test(tokenHash)) throw new StorageError('local_error');
       return jsonRequest('/rest/v1/rpc/issue_initial_result_link', { method: 'POST', json: { p_song_id: id, p_token_hash: tokenHash } });

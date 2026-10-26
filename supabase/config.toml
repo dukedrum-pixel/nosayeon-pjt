@@ -1,0 +1,4 @@
+project_id = "nosayeon-pjt"
+
+[functions.cleanup-expired-audio]
+verify_jwt = false

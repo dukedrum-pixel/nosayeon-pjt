@@ -6,7 +6,7 @@ import { SONG_ID } from '../src/result-access.mjs';
 try {
   const { values } = parseArgs({ options: { 'song-id': { type: 'string' }, 'allow-storage-delete': { type: 'boolean', default: false } } });
   if (!SONG_ID.test(values['song-id'] ?? '') || !values['allow-storage-delete']) {
-    console.log('사용 완료 음악의 삭제만 재시도: npm run result:cleanup -- --song-id <UUID> --allow-storage-delete');
+    console.log('만료·사용 완료 음악의 삭제만 재시도: npm run result:cleanup -- --song-id <UUID> --allow-storage-delete');
   } else {
     const backend = createStorageBackend({ url: process.env.SUPABASE_URL, serviceRoleKey: process.env.SUPABASE_SERVICE_ROLE_KEY });
     const result = await cleanupConsumedSong({ backend, songId: values['song-id'] });

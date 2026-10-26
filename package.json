@@ -13,6 +13,7 @@
     "result:serve": "node --use-env-proxy scripts/result-server.mjs",
     "result:issue": "node --use-env-proxy scripts/issue-result-link.mjs",
     "result:cleanup": "node --use-env-proxy scripts/cleanup-result.mjs",
+    "result:sweep": "node --use-env-proxy scripts/sweep-results.mjs",
     "test": "node --test --test-isolation=none"
   },
   "devDependencies": {

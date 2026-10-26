@@ -56,7 +56,7 @@ Node.js 24.5 이상과 Python 3가 필요하다. 페이지는 런타임 패키�
 
 ### 실제 API 연결
 
-DB·비공개 Storage 기반과 기존 음악 저장·검증을 완료했다. 결과 조회용 로컬 서버와 실제 `/result.html`의 연결·재생, 1회 다운로드·사용 후 삭제를 연결했다([결과 조회 안내](RESULT_ACCESS.md), [다운로드 정책](DOWNLOAD_POLICY.md)). 프롬프트 화면과 상태 미리보기의 CSP `connect-src 'none'`은 유지한다. 실제 결과 화면은 같은 출처 API와 메모리 Blob 재생만 허용한다. Edge Function 및 Cloudflare 공개 배포, 실제 생성 버튼, 7일 자동 삭제·재신청·메일은 아직 연결하지 않았다.
+DB·비공개 Storage 기반과 기존 음악 저장·검증을 완료했다. 결과 조회용 로컬 서버와 실제 `/result.html`의 연결·재생, 1회 다운로드·사용 후 삭제를 연결했다([결과 조회 안내](RESULT_ACCESS.md), [다운로드 정책](DOWNLOAD_POLICY.md)). [만료 자동 정리](EXPIRY_CLEANUP.md)는 Supabase Cron과 전용 Edge Function으로 실행한다. 프롬프트 화면과 상태 미리보기의 CSP `connect-src 'none'`은 유지한다. 실제 결과 화면은 같은 출처 API와 메모리 Blob 재생만 허용한다. 사용자 결과 API·Cloudflare 공개 배포, 실제 생성 버튼, 재신청·메일은 아직 연결하지 않았다.
 
 50일째 재발급 링크의 만료 기준, 재신청 횟수, 개인정보 보관기간은 제품 결정 대기 상태다. 이번 단계에서 해당 정책이나 50일 복구 보장을 구현하지 않았다.
 

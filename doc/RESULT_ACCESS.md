@@ -2,7 +2,7 @@
 
 ## 현재 구현
 
-서버가 결과 링크의 토큰 SHA-256을 Supabase의 `song_result_links`와 비교하고, 저장된 기존 음원의 메타데이터와 바이트를 조회한다. 실제 MP3의 원본 해시 일치와 브라우저 디코딩·재생을 확인했다. 현재 서버는 `127.0.0.1`에만 바인딩하는 Node.js 내부 검증 서버다. Supabase Edge Function이나 Cloudflare에는 배포하지 않았다.
+서버가 결과 링크의 토큰 SHA-256을 Supabase의 `song_result_links`와 비교하고, 저장된 기존 음원의 메타데이터와 바이트를 조회한다. 실제 MP3의 원본 해시 일치와 브라우저 디코딩·재생을 확인했다. 사용자 결과 조회 서버는 `127.0.0.1`에만 바인딩하는 Node.js 내부 검증 서버이며 공개 배포하지 않았다. [만료 정리 워커](EXPIRY_CLEANUP.md)만 별도로 Supabase Edge Function에 배포했다.
 
 1회 다운로드 권한 소진과 사용 후 파일 삭제를 연결했다([다운로드 정책](DOWNLOAD_POLICY.md)). 새 음악 생성·자동 재생성, Google 재조회, 재신청, 이메일 발송은 실행하지 않는다. 스트리밍 음원은 사용자 기기에 전달되므로 네이티브 다운로드 UI를 숨기는 것은 복제 방지를 의미하지 않는다.
 
@@ -31,7 +31,7 @@ SUPABASE_URL=https://fuvgpqkyhuyanbfavwcg.supabase.co npm run result:issue -- --
 - 서버는 `GET /api/result?id=<UUID>`, `GET /api/audio?id=<UUID>&file=<1..8>`, `POST /api/download?id=<UUID>`마다 토큰 해시·곡 ID·취소·사용 완료 여부·기간·저장 상태를 검사한다. 메타데이터에는 Interaction ID·사연·토큰·버킷 경로·키를 반환하지 않는다.
 - 오디오는 Storage에서 전체 파일을 읽고 SHA-256·MIME·크기·결정적 경로를 확인한 후 반환한다. 전송 전에 링크를 다시 조회해 취소·만료·저장 상태 변경을 확인한다. 자동 재시도는 없다.
 - 네이티브 오디오의 다중 Range 요청 대신 인증된 fetch로 받은 전체 파일을 메모리 Blob으로 재생한다. 이 내부 검증 서버는 오디오 합계 최대 64MiB이며 다중 접속 스트리밍용 최적화는 후속 작업이다. Storage URL·서비스 키를 브라우저에 전달하지 않는다.
-- 클라이언트 만료 타이머는 재생과 Blob을 해제하고, 서버는 새 요청을 독립적으로 차단한다. 이미 사용자 기기에 전달된 오디오 바이트를 회수할 수는 없다. 다운로드 사용 후 삭제는 구현했고, 7일 만료에 따른 자동 삭제 작업은 아직 없다.
+- 클라이언트 만료 타이머는 재생과 Blob을 해제하고, 서버는 새 요청을 독립적으로 차단한다. 이미 사용자 기기에 전달된 오디오 바이트를 회수할 수는 없다. 다운로드 사용 후 삭제와 7일 만료에 따른 자동 정리를 구현했다.
 - 응답은 `Cache-Control: no-store`, `Referrer-Policy: no-referrer`를 사용한다. 정적 파일은 명시적 허용 목록만 제공하며 Secret·소스·원본·로컬 토큰 파일은 공개하지 않는다. 다른 Origin과 허용되지 않은 Host 요청을 거부하고 CORS 허용 헤더를 추가하지 않는다. 요청 URL·헤더·원본 오류를 로그에 남기지 않는다.
 
 ## 실제 검증 (2026-10-27 KST)
@@ -43,4 +43,4 @@ SUPABASE_URL=https://fuvgpqkyhuyanbfavwcg.supabase.co npm run result:issue -- --
 - 보고서·캡처는 Git 제외 경로 `artifacts/result-live/`에 보존했다. 원본 토큰이나 전체 링크는 보고서에 넣지 않았다.
 - DB 권한을 실제 프로젝트에서 확인했다. 보안·성능 Advisors에 ERROR/WARN은 없었다. 서버 전용 테이블의 [RLS 정책 없음 안내](https://supabase.com/docs/guides/database/database-linter?lint=0008_rls_enabled_no_policy)와 기존 [미사용 인덱스 안내](https://supabase.com/docs/guides/database/database-linter?lint=0005_unused_index)는 INFO다.
 
-다운로드·삭제의 후속 구현·검증은 [별도 기록](DOWNLOAD_POLICY.md)을 참고한다. 7일 자동 삭제, 재신청, Edge Function 배포·호스팅·메일은 후속 작업이다.
+다운로드·삭제는 [별도 기록](DOWNLOAD_POLICY.md), 자동 정리 운영은 [스케줄 안내](EXPIRY_CLEANUP.md)를 참고한다. 재신청, 사용자 결과 API 배포·호스팅·메일은 후속 작업이다.

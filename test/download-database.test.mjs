@@ -8,7 +8,7 @@ test('다운로드 점유·사용·삭제 RPC의 원자적 조건과 권한을 �
   try {
     await db.exec(`create role anon; create role authenticated; create role service_role bypassrls;
       create schema storage; create table storage.buckets(id text primary key,name text,public boolean,file_size_limit bigint,allowed_mime_types text[]);`);
-    for (const name of ['20261026143658_private_audio_storage', '20261026154303_result_link_access', '20261026200705_single_download_cleanup']) {
+    for (const name of ['20261026143658_private_audio_storage', '20261026154303_result_link_access', '20261026200705_single_download_cleanup', '20261026203923_expired_audio_cleanup']) {
       await db.exec(await readFile(new URL(`../supabase/migrations/${name}.sql`, import.meta.url), 'utf8'));
     }
     const id = crypto.randomUUID(), hash = 'a'.repeat(64);

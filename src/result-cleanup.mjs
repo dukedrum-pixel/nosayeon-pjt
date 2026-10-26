@@ -8,7 +8,7 @@ function failure(error) {
     httpStatus: error instanceof StorageError ? error.httpStatus ?? null : null };
 }
 
-export async function cleanupConsumedSong({ backend, songId }) {
+export async function cleanupResultSong({ backend, songId }) {
   if (!SONG_ID.test(songId)) throw new Error('invalid_song');
   let claim;
   try { claim = await backend.claimCleanup(songId); } catch (error) { return failure(error); }
@@ -24,3 +24,6 @@ export async function cleanupConsumedSong({ backend, songId }) {
     return failure(error);
   }
 }
+
+// Compatibility for the previous download-only cleanup callers.
+export { cleanupResultSong as cleanupConsumedSong };
