@@ -10,6 +10,8 @@ DB 마이그레이션, 서버 전용 Storage REST 어댑터, 기존 Lyria 검증
 
 후속으로 `20261026203923 / expired_audio_cleanup`, `20261026203948 / audio_cleanup_scheduler`, `20261026205910 / rehome_cleanup_network_extension`을 적용했다. 7일 만료·사용 완료 파일의 자동 정리를 15분마다 실행하며, 인증용 전용 토큰은 DB에서 생성해 Vault에 보관했다. [자동 정리 운영](EXPIRY_CLEANUP.md)에서 활성화·일시 정지·검증 방법을 확인할 수 있다.
 
+현재는 [확정 정책](PRODUCT_POLICY.md)에 따라 고정 결과 페이지와 50일 이내 무제한 재신청도 연결했다. 적용 이력은 `20261026220530 / stable_page_reissue`, `20261026222405 / index_restore_request_reference`다. [재신청 안내](REISSUE.md)를 참고한다. 메일·카톡 전송은 아직 연동 전이다.
+
 이 문서의 저장 검증 단계는 이미 생성된 음악을 최초 저장하는 단계다. 해당 검증에서는 새 음악 생성, Google 재조회, 링크 발급, 파일 만료·삭제, 다운로드 권한 소진, 이메일, 공개 Edge Function을 실행하지 않았다. 후속 로컬 결과 조회용 최초 링크 외에 제품 정책 미확정 항목은 변경하지 않았다.
 
 ## 소유자의 프로젝트 준비

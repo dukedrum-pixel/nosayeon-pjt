@@ -2,10 +2,12 @@ import { createStorageBackend } from '../src/supabase-storage.mjs';
 import { createResultHandler } from '../src/result-access.mjs';
 import { createResultServer } from '../src/result-server.mjs';
 import { cleanupConsumedSong } from '../src/result-cleanup.mjs';
+import { createGoogleRestoreClient } from '../src/lyria-restore.mjs';
 
 try {
   const backend = createStorageBackend({ url: process.env.SUPABASE_URL, serviceRoleKey: process.env.SUPABASE_SERVICE_ROLE_KEY });
-  const server = createResultServer({ handler: createResultHandler({ backend }),
+  const restoreClient=process.env.GEMINI_API_KEY?createGoogleRestoreClient({apiKey:process.env.GEMINI_API_KEY}):undefined;
+  const server = createResultServer({ handler: createResultHandler({ backend,restoreClient }),
     afterDownloadResponse: async songId => {
       const result = await cleanupConsumedSong({ backend, songId });
       if (result.result === 'failed') console.error(`파일 삭제 실패 (${result.errorCode}${result.httpStatus ? `, HTTP ${result.httpStatus}` : ''}). result:cleanup 명령으로 삭제만 재개해 주세요.`);

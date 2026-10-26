@@ -34,6 +34,7 @@ function setup() {
     finishCleanup: async () => { state.cleanup = 'deleted'; state.deleted = true; return true; },
     failCleanup: async () => { state.cleanup = 'failed'; return true; },
   };
+  backend.cleanupFiles=backend.files;
   return { state, objects, backend, handle: createResultHandler({ backend, clock: () => now }) };
 }
 

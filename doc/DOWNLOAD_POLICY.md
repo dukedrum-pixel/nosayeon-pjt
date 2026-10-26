@@ -46,4 +46,4 @@ SUPABASE_URL=https://fuvgpqkyhuyanbfavwcg.supabase.co npm run result:cleanup -- 
 - 검증용 Interaction 표시는 `verification:download:`로 분리했다. 검증 후 파일 삭제가 끝난 해당 테스트 레코드만 정리했다. 최종 DB는 원래 음악 1개·파일 메타데이터 1개·저장 이벤트 3개·결과 링크 1개로 돌아왔고, 원래 음악은 `stored`, 원래 링크는 미사용 상태다.
 - 보고서·다운로드 파일·모바일 캡처는 Git 제외 경로 `artifacts/download-live/`에 보존했다. 키나 원본 토큰은 보고서에 넣지 않았다. 보안 Advisors는 ERROR/WARN 없이 기존 서버 전용 테이블의 INFO만 반환했다.
 
-이 문서의 최초 다운로드 검증 이후 7일 만료 자동 정리를 추가했다([구현·운영 기록](EXPIRY_CLEANUP.md)). 재신청·50일 경계·이메일·사용자 결과 서비스 공개 배포는 아직 구현하지 않았다.
+이 문서의 최초 다운로드 검증 이후 7일 만료 자동 정리를 추가했다([구현·운영 기록](EXPIRY_CLEANUP.md)). 이후 [고정 페이지·50일 재신청](REISSUE.md)을 구현했다. 메일·카톡 전송과 사용자 결과 서비스 공개 배포는 아직 연동 전이다.

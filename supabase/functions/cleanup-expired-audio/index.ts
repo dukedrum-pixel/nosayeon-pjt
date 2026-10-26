@@ -6,6 +6,6 @@ import { createCleanupSweepHandler } from '../../../src/cleanup-sweep.mjs';
 const backend = createStorageBackend({
   url: Deno.env.get('SUPABASE_URL'),
   serviceRoleKey: Deno.env.get('SUPABASE_SERVICE_ROLE_KEY'),
-  timeoutMs: 5000,
+  timeoutMs: 3000,
 });
-Deno.serve(createCleanupSweepHandler({ backend }));
+Deno.serve(createCleanupSweepHandler({ backend,budgetMs:20000 }));

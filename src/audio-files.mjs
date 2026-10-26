@@ -3,15 +3,27 @@ import { sha256 } from './storage-import.mjs';
 export function validateAudioFiles(files, id) {
   if (!Array.isArray(files) || !files.length || files.length > 8) throw new Error('invalid_files');
   let total = 0;
+  const version=files[0]?.delivery_version??0;
+  if(!Number.isInteger(version)||version<0)throw new Error('invalid_files');
   for (const [position, file] of files.entries()) {
     const suffix = file.mime_type === 'audio/wav' ? 'wav' : 'mp3';
     if (file.file_index !== position + 1 || !['audio/mpeg', 'audio/mp3', 'audio/wav'].includes(file.mime_type)
       || !/^[a-f0-9]{64}$/.test(file.sha256) || !Number.isInteger(file.byte_length)
       || file.byte_length < 1 || file.byte_length > 67108864 || file.bucket_id !== 'nosayeon-audio'
-      || file.storage_path !== `${id}/original/${file.file_index}-${file.sha256}.${suffix}`) throw new Error('invalid_files');
+      || (file.delivery_version??0)!==version
+      || file.storage_path !== `${id}/${version?`revisions/${version}/`:''}original/${file.file_index}-${file.sha256}.${suffix}`) throw new Error('invalid_files');
     total += file.byte_length;
   }
   if (total > 67108864) throw new Error('invalid_files');
+  return files;
+}
+
+export function validateCleanupFiles(files,id){
+  if(!Array.isArray(files)||!files.length||files.length>16)throw new Error('invalid_files');
+  const groups=new Map();
+  for(const file of files){const version=file.delivery_version??0;if(!groups.has(version))groups.set(version,[]);groups.get(version).push(file);}
+  if(groups.size>2)throw new Error('invalid_files');
+  for(const group of groups.values())validateAudioFiles(group.sort((a,b)=>a.file_index-b.file_index),id);
   return files;
 }
 

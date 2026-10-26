@@ -25,14 +25,12 @@ SUPABASE_URL=https://fuvgpqkyhuyanbfavwcg.supabase.co npm run result:issue -- --
 
 ## 접근과 만료
 
-- 신규 마이그레이션 `20261026154303_result_link_access.sql`을 실제 프로젝트에 적용했다. 기존 저장 마이그레이션은 재실행하지 않았다. `song_result_links`는 RLS 활성화, `anon`/`authenticated` 테이블 접근·RPC 실행 차단, `service_role` 전용이다.
-- 곡당 최초 링크 1개만 허용한다. 저장 완료 곡에만 발급하며 발급 시각부터 정확히 7일간 유효하다. 반복 발급은 거부하며 기존 만료 시각을 연장하거나 토큰을 교체하지 않는다. 미확정인 50일째 재신청 경계·횟수 정책은 구현하지 않았다.
-- 32바이트 난수 토큰은 링크의 fragment(`#token=...`)에 넣는다. 브라우저는 읽은 직후 주소창의 query·fragment를 제거하고 토큰을 메모리에서만 사용한다. 새로고침·뒤로가기로 토큰을 잃은 경우 원래 비공개 링크를 다시 열어야 한다. 서버에는 `Authorization: Bearer ...`로 전달한다.
-- 서버는 `GET /api/result?id=<UUID>`, `GET /api/audio?id=<UUID>&file=<1..8>`, `POST /api/download?id=<UUID>`마다 토큰 해시·곡 ID·취소·사용 완료 여부·기간·저장 상태를 검사한다. 메타데이터에는 Interaction ID·사연·토큰·버킷 경로·키를 반환하지 않는다.
-- 오디오는 Storage에서 전체 파일을 읽고 SHA-256·MIME·크기·결정적 경로를 확인한 후 반환한다. 전송 전에 링크를 다시 조회해 취소·만료·저장 상태 변경을 확인한다. 자동 재시도는 없다.
-- 네이티브 오디오의 다중 Range 요청 대신 인증된 fetch로 받은 전체 파일을 메모리 Blob으로 재생한다. 이 내부 검증 서버는 오디오 합계 최대 64MiB이며 다중 접속 스트리밍용 최적화는 후속 작업이다. Storage URL·서비스 키를 브라우저에 전달하지 않는다.
-- 클라이언트 만료 타이머는 재생과 Blob을 해제하고, 서버는 새 요청을 독립적으로 차단한다. 이미 사용자 기기에 전달된 오디오 바이트를 회수할 수는 없다. 다운로드 사용 후 삭제와 7일 만료에 따른 자동 정리를 구현했다.
-- 응답은 `Cache-Control: no-store`, `Referrer-Policy: no-referrer`를 사용한다. 정적 파일은 명시적 허용 목록만 제공하며 Secret·소스·원본·로컬 토큰 파일은 공개하지 않는다. 다른 Origin과 허용되지 않은 Host 요청을 거부하고 CORS 허용 헤더를 추가하지 않는다. 요청 URL·헤더·원본 오류를 로그에 남기지 않는다.
+- 결과 페이지 주소와 토큰은 곡별로 유지한다. 다운로드 권한은 저장 완료부터 7일·차수별 1회이며 생성 후 50일 이내 같은 페이지에서 무제한 재신청할 수 있다([확정 정책](PRODUCT_POLICY.md)).
+- 32바이트 난수 토큰은 비공개 링크의 fragment(`#token=...`)에 유지한다. 새로고침·다시 방문 시 같은 페이지를 조회하기 위한 변경이다. fragment는 HTTP 요청 URL·Referer에 실리지 않으며 API에는 Authorization 헤더로만 전달한다. 브라우저 저장소와 로그에는 넣지 않는다.
+- 결과 조회·재생·다운로드·재신청마다 토큰 해시·곡 ID·차수·상태를 검사한다. 재생·다운로드·재신청에는 `version`을 보내며 이전 차수는 HTTP 409로 차단한다. 메타데이터에 Interaction ID·사연·원본 토큰·버킷 경로·키를 반환하지 않는다.
+- 음원은 전체 파일을 읽고 SHA-256·MIME·크기·경로를 확인한 뒤 반환한다. 브라우저는 인증 fetch로 받은 메모리 Blob을 재생하며 재생 자체로 다운로드를 소진하지 않는다. 이미 전달한 바이트를 회수하는 기능은 아니다.
+- 다운로드 사용 후 삭제와 저장 완료 후 7일 자동 정리를 제공한다. 재신청은 이전 권한·음원을 먼저 없애고 차수별 경로에 같은 음악을 다시 준비한다([재신청 구현](REISSUE.md)).
+- 응답은 `Cache-Control: no-store`, `Referrer-Policy: no-referrer`를 사용한다. 정적 파일은 명시적 허용 목록만 제공하며 다른 Origin·Host 요청을 거부한다. 요청 URL·헤더·원문 오류는 기록하지 않는다.
 
 ## 실제 검증 (2026-10-27 KST)
 
@@ -43,4 +41,4 @@ SUPABASE_URL=https://fuvgpqkyhuyanbfavwcg.supabase.co npm run result:issue -- --
 - 보고서·캡처는 Git 제외 경로 `artifacts/result-live/`에 보존했다. 원본 토큰이나 전체 링크는 보고서에 넣지 않았다.
 - DB 권한을 실제 프로젝트에서 확인했다. 보안·성능 Advisors에 ERROR/WARN은 없었다. 서버 전용 테이블의 [RLS 정책 없음 안내](https://supabase.com/docs/guides/database/database-linter?lint=0008_rls_enabled_no_policy)와 기존 [미사용 인덱스 안내](https://supabase.com/docs/guides/database/database-linter?lint=0005_unused_index)는 INFO다.
 
-다운로드·삭제는 [별도 기록](DOWNLOAD_POLICY.md), 자동 정리 운영은 [스케줄 안내](EXPIRY_CLEANUP.md)를 참고한다. 재신청, 사용자 결과 API 배포·호스팅·메일은 후속 작업이다.
+다운로드·삭제는 [별도 기록](DOWNLOAD_POLICY.md), 자동 정리는 [스케줄 안내](EXPIRY_CLEANUP.md), 재신청은 [구현 안내](REISSUE.md)를 참고한다. 사용자 결과 API의 공개 배포·호스팅과 메일·카톡 전송은 후속 작업이다. 위 최초 검증 기록의 주소창 토큰 제거는 당시 동작이며, 이후 고정 페이지 정책에 따라 fragment 유지로 변경했다.

@@ -5,6 +5,14 @@ import { buildResultView } from '../web/js/result-state.mjs';
 const now = Date.parse('2026-10-26T15:00:00Z');
 const available = { status: 'available', expiresAt: '2026-11-02T15:00:00Z', canRestore: false };
 
+test('유효한 다운로드도 재신청할 수 있고 재신청 기한이 끝나면 버튼만 숨긴다',()=>{
+  const snapshot={...available,canRestore:true,restoreDeadline:'2026-10-27T00:00:00Z'};
+  assert.equal(buildResultView(snapshot,now).showRestore,true);
+  assert.equal(buildResultView(snapshot,Date.parse(snapshot.restoreDeadline)).showRestore,false);
+  assert.equal(buildResultView(snapshot,Date.parse(snapshot.restoreDeadline)).showDownload,true);
+  assert.equal(buildResultView({status:'restore_failed',canRestore:true},now).showRestore,true);
+});
+
 test('유효한 사용 가능 상태에서만 플레이어와 다운로드를 표시한다', () => {
   const view = buildResultView(available, now);
   assert.equal(view.showPlayer, true);

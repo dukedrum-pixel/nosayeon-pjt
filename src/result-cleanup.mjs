@@ -1,5 +1,5 @@
-import { SONG_ID } from './result-access.mjs';
-import { validateAudioFiles } from './audio-files.mjs';
+import { SONG_ID } from './identifiers.mjs';
+import { validateCleanupFiles } from './audio-files.mjs';
 import { StorageError } from './storage-import.mjs';
 
 function failure(error) {
@@ -14,8 +14,8 @@ export async function cleanupResultSong({ backend, songId }) {
   try { claim = await backend.claimCleanup(songId); } catch (error) { return failure(error); }
   if (!claim) return { result: 'not_claimed' };
   try {
-    const files = validateAudioFiles(await backend.files(songId), songId);
-    await backend.remove(files.map(file => file.storage_path));
+    const files = validateCleanupFiles(await backend.cleanupFiles(songId,claim), songId);
+    for(let i=0;i<files.length;i+=8)await backend.remove(files.slice(i,i+8).map(file => file.storage_path));
     for (const file of files) if (await backend.objectExists(file.storage_path)) throw new Error('delete_unconfirmed');
     if (!await backend.finishCleanup(songId, claim)) throw new Error('lease_lost');
     return { result: 'deleted', files: files.length };

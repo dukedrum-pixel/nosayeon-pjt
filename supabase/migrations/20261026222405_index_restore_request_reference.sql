@@ -1,0 +1,1 @@
+create index song_result_links_restore_request on public.song_result_links(restore_request_id);

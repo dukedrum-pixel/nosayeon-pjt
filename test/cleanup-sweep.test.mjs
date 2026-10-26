@@ -18,6 +18,7 @@ function setup() {
     finishCleanup: async () => true, failCleanup: async () => true,
     recordCleanupRun: async summary => records.push({ ...summary }),
   };
+  backend.cleanupFiles=backend.files;
   return { backend, objects, records, calls };
 }
 const request = (auth = token, method = 'POST') => new Request('https://example.invalid/functions/v1/cleanup-expired-audio', {

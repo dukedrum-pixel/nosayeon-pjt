@@ -1,6 +1,6 @@
 import { sha256 } from './storage-import.mjs';
 import { cleanupResultSong } from './result-cleanup.mjs';
-import { SONG_ID } from './result-access.mjs';
+import { SONG_ID } from './identifiers.mjs';
 
 export async function runCleanupSweep({ backend, clock = () => performance.now(), budgetMs = 40000 }) {
   const started = clock();
