@@ -1,0 +1,11 @@
+{
+  "name": "nosayeon-pjt",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": { "node": ">=24.5.0" },
+  "scripts": {
+    "spike": "node --use-env-proxy scripts/lyria-spike.mjs",
+    "test": "node --test --test-isolation=none"
+  }
+}
