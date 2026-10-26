@@ -5,20 +5,33 @@
 ## 현재 상태
 
 - 1단계 기술 검증용 CLI 구현. Node.js 24.5 이상, 추가 패키지 설치 불필요.
-- 실제 Google API 호출: **아직 실행하지 않음**.
-- 동일 음원 복구 / 50일 재신청 정책: **검증 전**.
-- 환경에 Google Secret이 등록돼 있지 않고 Google API 호스트가 네트워크 허용 목록에 없다.
+- 실제 Google API 호출: **테스트 음악 1곡 생성 및 동일 Interaction 재조회 성공**.
+- 즉시 재조회 오디오의 SHA-256 일치 확인. **50일 후 복구 가능 여부는 검증 전**.
+- 새 Cloud 작업에서 Secret `ready`, 네트워크 정책 `enforced` 확인. 네트워크 명령에는 실행 도구의 명시적 네트워크 접근 권한이 필요했다.
 - 기존 `PROJECT_HANDOFF.md`는 원본 인계 기록으로 보존한다.
+
+## 실제 검증 결과 (2026-10-26 23:06 KST)
+
+- 기준 코드: `codex/lyria-recovery-spike`, `8d34a2f`.
+- `npm test`: 모의 테스트 11개 통과. 실제 API 결과와 구분한다.
+- `npm run spike -- --allow-paid-call`: 생성 POST 1회, 같은 Interaction GET 1회. 자동 재생성 없음.
+- 모델: `lyria-3.5`. 생성 응답 소요시간 25,089ms, 재조회·비교 696ms.
+- 결과: `identical`. 원본과 재조회 모두 inline `audio/mpeg`, 각 3,021,074바이트.
+- `ffprobe` 확인: 약 2분 6초(125.623초), MP3, 44.1kHz 스테레오, 약 192kbps. `sha256sum`으로 두 파일의 해시도 별도 재확인했다.
+- 양쪽 SHA-256: `bd4905f2f0b26e675b154e11e1a59851c6f13c987dbf0880487f54d442fda102`.
+- 로컬 실행 폴더: `artifacts/lyria/run-QhkKWf`. Interaction ID, 최초 응답, 원본/복구 MP3, `baseline.json`, `report.json`, `timing.json` 보존. 원본 응답과 음악은 Git에 포함하지 않는다.
+- 이후 검증은 `npm run spike -- --resume artifacts/lyria/run-QhkKWf`로 같은 Interaction만 조회한다. 위 생성 명령을 반복하지 않는다.
+- 즉시 복구의 바이트 동일성만 입증했다. Google AI Studio의 55일 보관 설정, 실제 청구액, 50일 뒤 복구는 별도 확인이 필요하다.
 
 ## 새 Cloud 작업에서 이어가기
 
-사용자는 API 키와 허용 도메인을 설정하고 환경을 다시 게시했다고 확인했다. 그러나 기존 개발 작업에서 관측한 실행환경에는 아직 Secret 바인딩과 Google 허용 도메인이 없다. 사용자의 게시를 반복 요청하지 말고 새 작업에서 실제 준비 상태를 확인한다.
+사용자가 게시한 API 키와 허용 도메인이 새 작업에 적용됐고 실제 검증도 완료했다. 아래는 최초 실행 절차이며, 이번 음악에 대한 후속 작업은 저장된 실행 폴더의 `--resume`을 사용한다. 새 작업에서도 실제 준비 상태를 확인한다.
 
 1. 개발 브랜치 `codex/lyria-recovery-spike`의 최신 코드를 사용한다. `main`에는 검증 도구가 없을 수 있다.
 2. Cloud 환경 상태에서 `GEMINI_API_KEY` 바인딩의 준비 상태와 Google 도메인 허용을 확인한다. 키 값은 출력하지 않는다.
-3. `npm test` 실행 후, 준비가 확인되면 `npm run spike -- --allow-paid-call`로 테스트 음악 1곡을 생성한다. 사용자는 개발 시작과 이 1곡 검증을 진행하도록 요청한 상태다.
+3. `npm test` 실행 후 기존 실행 폴더를 확인한다. 승인된 테스트 1곡은 이미 생성했으므로 새 생성 명령을 반복하지 않는다.
 4. 실패 시 자동 재생성하지 않는다. `artifacts/lyria/run-*`의 저장 상태를 확인하고 가능한 경우 `--resume`으로 동일 Interaction 조회만 재개한다.
-5. 실제 결과와 모의 테스트 결과를 구분해서 보고한다. 실제 생성/복구 성공은 아직 확인되지 않았다.
+5. 실제 결과와 모의 테스트 결과를 구분해서 보고한다. 이번 즉시 재조회는 성공했으며 장기 보관은 아직 검증하지 않았다.
 
 ## 확인한 공식 계약
 
