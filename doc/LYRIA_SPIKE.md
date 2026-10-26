@@ -10,6 +10,16 @@
 - 환경에 Google Secret이 등록돼 있지 않고 Google API 호스트가 네트워크 허용 목록에 없다.
 - 기존 `PROJECT_HANDOFF.md`는 원본 인계 기록으로 보존한다.
 
+## 새 Cloud 작업에서 이어가기
+
+사용자는 API 키와 허용 도메인을 설정하고 환경을 다시 게시했다고 확인했다. 그러나 기존 개발 작업에서 관측한 실행환경에는 아직 Secret 바인딩과 Google 허용 도메인이 없다. 사용자의 게시를 반복 요청하지 말고 새 작업에서 실제 준비 상태를 확인한다.
+
+1. 개발 브랜치 `codex/lyria-recovery-spike`의 최신 코드를 사용한다. `main`에는 검증 도구가 없을 수 있다.
+2. Cloud 환경 상태에서 `GEMINI_API_KEY` 바인딩의 준비 상태와 Google 도메인 허용을 확인한다. 키 값은 출력하지 않는다.
+3. `npm test` 실행 후, 준비가 확인되면 `npm run spike -- --allow-paid-call`로 테스트 음악 1곡을 생성한다. 사용자는 개발 시작과 이 1곡 검증을 진행하도록 요청한 상태다.
+4. 실패 시 자동 재생성하지 않는다. `artifacts/lyria/run-*`의 저장 상태를 확인하고 가능한 경우 `--resume`으로 동일 Interaction 조회만 재개한다.
+5. 실제 결과와 모의 테스트 결과를 구분해서 보고한다. 실제 생성/복구 성공은 아직 확인되지 않았다.
+
 ## 확인한 공식 계약
 
 - [음악 생성 문서](https://ai.google.dev/gemini-api/docs/music-generation): `lyria-3.5`와 Interactions API를 통한 전체 곡 생성 및 MP3 출력.
