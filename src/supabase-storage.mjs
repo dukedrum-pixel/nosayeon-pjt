@@ -69,18 +69,40 @@ export function createStorageBackend({ url, serviceRoleKey, fetchImpl = globalTh
     },
     resultLink: async (id, tokenHash) => {
       if (!/^[0-9a-f-]{36}$/.test(id) || !/^[0-9a-f]{64}$/.test(tokenHash)) throw new StorageError('local_error');
-      const rows = await jsonRequest(`/rest/v1/song_result_links?song_id=eq.${id}&token_hash=eq.${tokenHash}&select=song_id,issued_at,expires_at,revoked_at,songs!inner(storage_status)&limit=1`);
+      const rows = await jsonRequest(`/rest/v1/song_result_links?song_id=eq.${id}&token_hash=eq.${tokenHash}&select=song_id,issued_at,expires_at,revoked_at,consumed_at,cleanup_status,songs!inner(storage_status)&limit=1`);
       if (!Array.isArray(rows)) throw new StorageError('invalid_response');
       return rows[0] ?? null;
     },
     register: args => jsonRequest('/rest/v1/rpc/register_generated_song', { method: 'POST', json: args }),
+    claimDownload: (id, hash) => jsonRequest('/rest/v1/rpc/claim_result_download', { method: 'POST', json: { p_song_id: id, p_token_hash: hash } }),
+    releaseDownload: (id, claim) => jsonRequest('/rest/v1/rpc/release_result_download', { method: 'POST', json: { p_song_id: id, p_claim: claim } }),
+    consumeDownload: (id, claim) => jsonRequest('/rest/v1/rpc/consume_result_download', { method: 'POST', json: { p_song_id: id, p_claim: claim } }),
+    claimCleanup: id => jsonRequest('/rest/v1/rpc/claim_result_cleanup', { method: 'POST', json: { p_song_id: id } }),
+    finishCleanup: (id, claim) => jsonRequest('/rest/v1/rpc/finish_result_cleanup', { method: 'POST', json: { p_song_id: id, p_claim: claim } }),
+    failCleanup: (id, claim) => jsonRequest('/rest/v1/rpc/fail_result_cleanup', { method: 'POST', json: { p_song_id: id, p_claim: claim } }),
+    remove: async paths => {
+      if (!Array.isArray(paths) || paths.length < 1 || paths.length > 8) throw new StorageError('local_error');
+      for (const path of paths) objectPath(path);
+      const response = await request(`/storage/v1/object/${BUCKET}`, { method: 'DELETE', json: { prefixes: paths } });
+      await response.body?.cancel();
+    },
+    objectExists: async path => {
+      objectPath(path);
+      const slash = path.lastIndexOf('/');
+      const name = path.slice(slash + 1);
+      // POST metadata lookup avoids stale CDN responses from object downloads.
+      const rows = await jsonRequest(`/storage/v1/object/list/${BUCKET}`, { method: 'POST',
+        json: { prefix: path.slice(0, slash), search: name, limit: 100, offset: 0 } });
+      if (!Array.isArray(rows) || rows.length >= 100 || rows.some(row => typeof row?.name !== 'string')) throw new StorageError('invalid_response');
+      return rows.some(row => row.name === name);
+    },
     claim: id => jsonRequest('/rest/v1/rpc/claim_song_storage', { method: 'POST', json: { p_song_id: id } }),
     files: id => {
       if (!/^[0-9a-f-]{36}$/.test(id)) throw new StorageError('invalid_response');
       return jsonRequest(`/rest/v1/song_files?song_id=eq.${id}&order=file_index.asc&select=file_index,mime_type,byte_length,sha256,bucket_id,storage_path`);
     },
-    download: async path => {
-      const response = await request(objectPath(path), { optionalObject: true });
+    download: async (path, { fresh = false } = {}) => {
+      const response = await request(objectPath(path) + (fresh ? `?cacheNonce=${crypto.randomUUID()}` : ''), { optionalObject: true });
       if (response === null) return null;
       try { return await readLimited(response, LIMIT); }
       catch (error) { throw error instanceof StorageError ? error : new StorageError('network_error'); }

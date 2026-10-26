@@ -22,8 +22,10 @@
         <audio id="result-audio" controls preload="none" controlslist="nodownload" aria-describedby="playback-hint"></audio>
         <p id="playback-hint" class="hint">음악 재생만으로 다운로드 횟수를 사용하지 않습니다.</p>
       </div>
-      <button id="result-download" class="primary" type="button" disabled hidden>노래 다운로드 · 준비 중</button>
-      <p class="hint">내부 검증 단계입니다. 다운로드·재신청·이메일 기능은 아직 제공하지 않습니다.</p>
+      <button id="result-download" class="primary" type="button" disabled hidden>노래 다운로드 · 1회</button>
+      <p id="download-message" class="hint" role="status" aria-live="polite"></p>
+      <p class="hint">다운로드 요청이 시작되면 링크를 사용한 것으로 처리합니다. 도중에 취소하거나 연결이 끊겨도 사용 완료가 될 수 있습니다. 여러 음원은 ZIP 파일 하나로 받습니다.</p>
+      <p class="hint">내부 검증 단계입니다. 재신청·이메일 기능은 아직 제공하지 않습니다.</p>
     </section>
     <noscript><p class="notice">결과를 확인하려면 JavaScript를 활성화해 주세요.</p></noscript>
   </main>

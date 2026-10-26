@@ -11,7 +11,7 @@ const staticFiles = new Map([
     [`/js/${name}.mjs`, [`js/${name}.mjs`, 'text/javascript']]),
 ]);
 
-export function createResultServer({ handler, webRoot = new URL('../web/', import.meta.url) }) {
+export function createResultServer({ handler, afterDownloadResponse = async () => {}, webRoot = new URL('../web/', import.meta.url) }) {
   return createServer(async (req, res) => {
     const safeHeaders = { 'Cache-Control': 'no-store', 'Referrer-Policy': 'no-referrer', 'X-Content-Type-Options': 'nosniff' };
     try {
@@ -26,9 +26,22 @@ export function createResultServer({ handler, webRoot = new URL('../web/', impor
       }
       const url = new URL(req.url, origin);
       if (url.pathname.startsWith('/api/')) {
+        const controller = new AbortController();
+        const disconnected = () => { if (!res.writableFinished) controller.abort(); };
+        res.once('close', disconnected);
         const response = await handler(new Request(url, { method: req.method,
-          headers: { Authorization: req.headers.authorization ?? '' } }));
+          headers: { Authorization: req.headers.authorization ?? '' }, signal: controller.signal }));
         const bytes = Buffer.from(await response.arrayBuffer());
+        if (url.pathname === '/api/download' && response.status === 200) {
+          let called = false;
+          const cleanup = () => {
+            if (called) return; called = true;
+            Promise.resolve().then(() => afterDownloadResponse(url.searchParams.get('id'))).catch(() => {});
+          };
+          res.once('finish', cleanup); res.once('close', cleanup);
+          if (res.destroyed) cleanup();
+        }
+        if (res.destroyed) return;
         res.writeHead(response.status, Object.fromEntries(response.headers));
         res.end(bytes);
         return;
@@ -39,6 +52,6 @@ export function createResultServer({ handler, webRoot = new URL('../web/', impor
       res.writeHead(200, { ...safeHeaders, 'Content-Type': `${file[1]}; charset=utf-8`,
         'Content-Security-Policy': "default-src 'self'; connect-src 'self'; media-src blob:; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'" });
       res.end(req.method === 'HEAD' ? undefined : bytes);
-    } catch { res.writeHead(503, safeHeaders).end(); }
+    } catch { if (!res.headersSent && !res.destroyed) res.writeHead(503, safeHeaders).end(); else res.destroy(); }
   });
 }

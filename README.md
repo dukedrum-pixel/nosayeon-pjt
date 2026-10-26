@@ -7,6 +7,7 @@
 - [내부 테스트 페이지 실행·UI 통합 계약](doc/TEST_PAGE.md)
 - [Supabase 프로젝트 준비·DB·기존 음악 저장](doc/SUPABASE_SETUP.md)
 - [결과 링크 토큰 검증·실제 음원 조회](doc/RESULT_ACCESS.md)
+- [1회 다운로드·파일 삭제·실패 복구](doc/DOWNLOAD_POLICY.md)
 
 ```sh
 npm ci       # 전체 테스트를 위한 개발 의존성 설치
@@ -16,6 +17,6 @@ npm test     # 외부 API 호출 없는 테스트
 
 Node.js 24.5 이상, 페이지 실행에는 Python 3가 필요합니다. 프롬프트 준비 화면은 음악을 생성하지 않습니다. 실제 테스트 음악 1곡은 이미 생성·재조회해 파일 해시 일치를 확인했습니다. 추가 생성 대신 저장된 실행 폴더에 `--resume`을 사용하세요.
 
-Supabase 실제 프로젝트에 DB 마이그레이션과 비공개 버킷 구성을 적용하고, 기존 MP3의 업로드·재다운로드 SHA-256 일치를 확인했습니다. `npm run storage:import -- --run <기존 실행 폴더>`는 외부 호출 없이 원본 파일을 검사합니다. 장기 보관·이메일·다운로드 정책은 아직 구현 전입니다.
+Supabase 실제 프로젝트에 DB 마이그레이션과 비공개 버킷 구성을 적용하고, 기존 MP3의 업로드·재다운로드 SHA-256 일치를 확인했습니다. `npm run storage:import -- --run <기존 실행 폴더>`는 외부 호출 없이 원본 파일을 검사합니다. 장기 보관·재신청·이메일은 아직 구현 전입니다.
 
-`npm run dev` 실행 후 `/result-preview.html`에서 예시 데이터 기반 상태별 화면을 확인할 수 있습니다. 실제 결과 페이지 `/result.html`은 별도 `npm run result:serve` 서버에서 토큰을 검증하고 기존 Supabase 음원을 재생합니다. 서비스 키는 서버에서만 사용하며, 다운로드 사용 처리·삭제·재신청·메일은 아직 연결하지 않았습니다. 실행 설정과 내부 조회 링크 발급 방법은 [결과 조회 안내](doc/RESULT_ACCESS.md)를 참고하세요.
+`npm run dev` 실행 후 `/result-preview.html`에서 예시 데이터 기반 상태별 화면을 확인할 수 있습니다. 실제 결과 페이지 `/result.html`은 별도 `npm run result:serve` 서버에서 토큰을 검증하고 기존 Supabase 음원을 재생합니다. 1회 다운로드와 사용 후 파일 삭제를 연결했습니다. 재신청·7일 자동 삭제 작업·메일은 아직 구현 전입니다. 실행 설정과 내부 조회 링크 발급 방법은 [결과 조회 안내](doc/RESULT_ACCESS.md)를 참고하세요.

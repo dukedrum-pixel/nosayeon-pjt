@@ -61,3 +61,31 @@ test('오디오가 없다는 구조화된 응답만 업로드 후보로 취급',
   const denied = createStorageBackend({ url, serviceRoleKey, fetchImpl: async () => new Response(JSON.stringify({ statusCode: '403', error: 'AccessDenied' }), { status: 400 }) });
   await assert.rejects(denied.download(path), /HTTP 400/);
 });
+
+test('삭제는 검증된 정확한 오브젝트 경로만 Storage API에 전달한다', async () => {
+  const calls = [];
+  const backend = createStorageBackend({ url, serviceRoleKey, fetchImpl: async (target, options) => {
+    calls.push({ target, options }); return new Response('[]');
+  } });
+  await backend.remove([path]);
+  assert.equal(calls[0].target.pathname, '/storage/v1/object/nosayeon-audio');
+  assert.equal(calls[0].options.method, 'DELETE');
+  assert.deepEqual(JSON.parse(calls[0].options.body), { prefixes: [path] });
+  await assert.rejects(backend.remove(['../outside']), /local_error/);
+  await assert.rejects(backend.remove([]), /local_error/);
+  assert.equal(calls.length, 1);
+});
+
+test('삭제 확인은 POST 목록에서 정확한 파일명을 찾고 캐시 우회 조회는 같은 호스트만 사용한다', async () => {
+  const calls = [];
+  const backend = createStorageBackend({ url, serviceRoleKey, fetchImpl: async (target, options) => {
+    calls.push({ target, options }); return new Response('[]');
+  } });
+  assert.equal(await backend.objectExists(path), false);
+  assert.equal(calls[0].target.pathname, '/storage/v1/object/list/nosayeon-audio');
+  assert.equal(calls[0].options.method, 'POST');
+  assert.equal(JSON.parse(calls[0].options.body).search, path.split('/').at(-1));
+  await backend.download(path, { fresh: true });
+  assert.equal(calls[1].target.origin, url);
+  assert.ok(calls[1].target.searchParams.get('cacheNonce'));
+});

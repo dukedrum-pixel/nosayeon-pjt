@@ -36,6 +36,7 @@ export async function importGeneratedAudio({ manifest, backend, onProgress = () 
     p_files: manifest.files.map(file => ({ file_index: file.index, mime_type: file.mime, byte_length: file.bytes.byteLength, sha256: file.sha256 })),
   });
   if (!song?.id) throw new StorageError('invalid_response');
+  if (song.storage_status === 'deleted') throw new StorageError('storage_removed');
   if (song.storage_status === 'stored') return { songId: song.id, result: 'already_stored', files: manifest.files.length };
   const claim = await backend.claim(song.id);
   if (!claim) return { songId: song.id, result: 'busy', files: manifest.files.length };
