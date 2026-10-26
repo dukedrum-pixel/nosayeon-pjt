@@ -3,10 +3,16 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "engines": { "node": ">=24.5.0" },
+  "engines": {
+    "node": ">=24.5.0"
+  },
   "scripts": {
     "dev": "python3 -m http.server 4173 --bind 127.0.0.1 --directory web",
     "spike": "node --use-env-proxy scripts/lyria-spike.mjs",
+    "storage:import": "node --use-env-proxy scripts/import-spike.mjs",
     "test": "node --test --test-isolation=none"
+  },
+  "devDependencies": {
+    "@electric-sql/pglite": "0.5.12"
   }
 }

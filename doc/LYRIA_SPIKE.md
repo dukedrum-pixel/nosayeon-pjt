@@ -64,6 +64,7 @@ npm run spike -- --allow-paid-call
 npm run spike -- --resume artifacts/lyria/run-XXXXXX
 
 # 외부 API 호출 없는 모의 응답 테스트
+npm ci
 npm test
 ```
 
