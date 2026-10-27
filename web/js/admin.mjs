@@ -2,7 +2,7 @@ const $ = id => document.getElementById(id);
 let token = '', session = 0, offset = 0, filterId = null, rows = [], selected = null, blobUrl = null;
 let emailReady = false, operationId = null, busy = false;
 const labels = { stored: '저장 완료', deleted: '파일 삭제됨', pending: '저장 대기', storing: '저장 중', failed: '실패',
-  idle: '대기', restoring: '복구 중', prepared: '파일 준비 · 미발송', sending: '처리 중 · 결과 확인 필요', sent: 'Gmail 접수 완료', unknown: '발송 결과 불명' };
+  idle: '대기', restoring: '복구 중', prepared: '파일 준비 · 미발송', sending: '처리 중 · 결과 확인 필요', sent: 'Gmail 접수 완료', unknown: '발송 결과 불명', pending_setup: '설정 대기 · 미발송', skipped: '기간·차수 변경 · 미발송' };
 const errors = { unauthorized: '관리자 인증을 확인해 주세요.', content_mismatch: '원본과 다른 파일입니다. 크기와 SHA-256이 모두 일치해야 합니다.',
   retention_ended: '최초 생성 후 50일이 지나 직접 전달을 준비할 수 없습니다.', mp3_required: '등록된 MP3 원본을 선택해 주세요.',
   busy: '다른 파일을 처리 중입니다. 잠시 후 다시 시도해 주세요.', invalid_request: '곡 ID와 입력 내용을 확인해 주세요.',
@@ -54,7 +54,8 @@ async function dashboard() {
   capacity('db', data.databaseBytes, data.databaseCapacityBytes);
   capacity('storage', data.storageBytes, data.storageCapacityBytes, data.unknownStorageSizes > 0);
   text('audio-used', `이 프로젝트 전체 파일 중 음악 ${size(data.audioBytes)}. 조직 전체 사용량·청구액과는 다릅니다.`);
-  text('notification-count', `고객 안내 대기·실패 ${data.pendingNotifications}건`);
+  text('notification-count', `고객 안내 대기·실패 ${data.pendingNotifications}건 · 접수 ${data.notificationsAccepted ?? 0}건 · 확인 필요 ${data.notificationsUncertain ?? 0}건`);
+  text('result-email-state', data.integrations.resultEmail === 'enabled' ? '신규 안내 활성' : '신규 안내 비활성');
   text('manual-count', `파일 준비 ${data.manualPrepared} · Gmail 접수 ${data.manualEmailAccepted} · 확인 필요 ${data.manualEmailUncertain}`);
   emailReady = data.integrations.email === 'configured';
   text('email-connection', emailReady ? 'Gmail 인증 설정됨' : 'Gmail 인증 미연결');
@@ -120,7 +121,19 @@ async function history() {
   }
   if (!data.exports.length) { const row = document.createElement('tr'); const td = cell(row, '직접 전달 이력이 없습니다.'); td.colSpan = 4; $('history').append(row); }
 }
-async function refresh() { message(''); await Promise.all([dashboard(), songs(), history()]); }
+async function notificationHistory() {
+  const data = await (await api('/api/admin/notifications')).json();
+  $('notification-history').replaceChildren();
+  for (const item of data.notifications) {
+    const row = document.createElement('tr');
+    cell(row, date(item.created_at)); cell(row, item.song_id, 'mono');
+    cell(row, `차수 ${item.delivery_version} · ${item.event === 'initial_ready' ? '최초 완료' : '재신청 완료'}`);
+    cell(row, pill(labels[item.status] ?? '대기 · 미발송', ['failed', 'unknown', 'sending'].includes(item.status)));
+    $('notification-history').append(row);
+  }
+  if (!data.notifications.length) { const row = document.createElement('tr'); const td = cell(row, '고객 완료 안내 이력이 없습니다.'); td.colSpan = 4; $('notification-history').append(row); }
+}
+async function refresh() { message(''); await Promise.all([dashboard(), songs(), history(), notificationHistory()]); }
 async function login(value) {
   if (!/^[A-Za-z0-9_-]{43,128}$/.test(value)) { message('올바른 관리자 인증 파일 또는 토큰을 사용해 주세요.'); return; }
   token = value; session++; $('access-token').value = ''; $('credential').value = '';
@@ -130,7 +143,7 @@ async function login(value) {
 function logout() {
   token = ''; session++; selected = null; rows = []; offset = 0; filterId = null; emailReady = false; operationId = null;
   $('workspace').hidden = true; $('login').hidden = false; $('logout').hidden = true; $('delivery').hidden = true;
-  $('songs').replaceChildren(); $('history').replaceChildren(); $('prepare-form').reset(); $('file-index').replaceChildren();
+  $('songs').replaceChildren(); $('history').replaceChildren(); $('notification-history').replaceChildren(); $('prepare-form').reset(); $('file-index').replaceChildren();
   $('access-token').value = ''; $('credential').value = ''; clearFile();
 }
 async function prepare(send = false) {

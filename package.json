@@ -17,7 +17,11 @@
     "restore:verify": "node --use-env-proxy scripts/verify-restore.mjs",
     "gmail:authorize": "node --use-env-proxy scripts/gmail-authorize.mjs",
     "gmail:check": "node --use-env-proxy scripts/check-gmail.mjs",
-    "test": "node --test --test-isolation=none"
+    "test": "node --test --test-isolation=none",
+    "notification:preview": "node scripts/preview-result-email.mjs",
+    "notification:configure": "node --use-env-proxy scripts/configure-result-email.mjs",
+    "notification:deliver": "node --use-env-proxy scripts/deliver-result-notifications.mjs",
+    "result:public": "node --use-env-proxy scripts/public-result-server.mjs"
   },
   "devDependencies": {
     "@electric-sql/pglite": "0.5.12"

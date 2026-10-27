@@ -6,6 +6,8 @@ import { createGoogleRestoreClient } from '../src/lyria-restore.mjs';
 import { createAdminHandler } from '../src/admin-access.mjs';
 import { createGmailDelivery } from '../src/gmail-delivery.mjs';
 import { loadGmailConfiguration } from '../src/gmail-auth.mjs';
+import { notificationConfiguration } from '../src/result-notifications.mjs';
+import { startNotificationWorker } from '../src/notification-worker.mjs';
 import { randomBytes } from 'node:crypto';
 import { mkdir, writeFile } from 'node:fs/promises';
 
@@ -23,8 +25,10 @@ try {
   const gmailConfig = await loadGmailConfiguration();
   const sender = gmailConfig?.sender || process.env.GMAIL_SENDER || 'peter@humansyntax.kr';
   const mailer = gmailConfig ? createGmailDelivery(gmailConfig) : undefined;
+  const notifications = notificationConfiguration();
+  if (notifications && !mailer) throw new Error('notification_mail_not_configured');
   const adminHandler = createAdminHandler({ backend, accessToken: adminToken, mailer, sender,
-    databaseCapacityBytes: capacity('ADMIN_DATABASE_CAPACITY_BYTES'), storageCapacityBytes: capacity('ADMIN_STORAGE_CAPACITY_BYTES') });
+    databaseCapacityBytes: capacity('ADMIN_DATABASE_CAPACITY_BYTES'), storageCapacityBytes: capacity('ADMIN_STORAGE_CAPACITY_BYTES'), resultEmailEnabled: Boolean(notifications) });
   const server = createResultServer({ handler: createResultHandler({ backend,restoreClient }),
     adminHandler,
     afterDownloadResponse: async songId => {
@@ -32,6 +36,9 @@ try {
       if (result.result === 'failed') console.error(`파일 삭제 실패 (${result.errorCode}${result.httpStatus ? `, HTTP ${result.httpStatus}` : ''}). result:cleanup 명령으로 삭제만 재개해 주세요.`);
     },
   });
+  const stopNotifications = startNotificationWorker({ backend, mailer, configuration: notifications,
+    onResult: result => console.log(`고객 완료 안내: ${JSON.stringify(result)}`) });
+  server.on('close', stopNotifications);
   server.on('error', () => { console.error('결과 서버를 시작할 수 없습니다. 설정과 포트를 확인해 주세요.'); process.exitCode = 1; });
   server.listen(4174, '127.0.0.1', () => console.log('로컬 결과 조회 서버: http://127.0.0.1:4174 (키·토큰·요청 URL은 기록하지 않습니다.)'));
 } catch { console.error('서버 설정을 확인해 주세요. 키 값은 출력하지 않습니다.'); process.exitCode = 1; }

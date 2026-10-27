@@ -42,7 +42,7 @@ DB 크기는 `pg_database_size(current_database())`이며 WAL·시스템 파일�
 
 ## Gmail 가계정 연결
 
-초기 발신 주소는 사용자가 지정한 `peter@humansyntax.kr`이다. 현재 환경에는 Gmail 앱 전용 인증이 없어 실제 발송은 비활성이다. ChatGPT의 Gmail 연결은 이 서비스 서버의 OAuth 인증을 대신하지 않는다. 실제 계정 로그인이 없으므로 발신 주소에 대한 소유·송신 권한도 아직 실검증하지 않았다.
+초기 발신 주소는 사용자가 지정한 `peter@humansyntax.kr`이다. 2026-10-28(한국 시간) 최신 게시 환경에서 앱 전용 Gmail OAuth 토큰 갱신·발신 계정 일치를 확인했고, 기존 MP3를 dukedrum@gmail.com으로 1회 첨부 발송해 사용자 수신까지 확인했다. ChatGPT의 Gmail 연결과 서비스 서버의 OAuth 인증은 별개다. 고객 완료 안내 메일은 별도 설정이며 현재 비활성이다. 기존 테스트를 자동 재실행하지 않는다.
 
 1. Google Cloud 프로젝트에서 Gmail API를 활성화하고 OAuth 클라이언트와 동의 화면을 준비한다.
 2. 해당 가계정으로 OAuth 동의를 완료한다. `https://www.googleapis.com/auth/gmail.send`와 계정 이메일 확인용 `openid email`, offline access를 사용해 refresh token을 받는다. 메일 읽기·삭제·Drive 권한은 요청하지 않는다. 내부 Workspace 앱 설정 가능 여부와 관리자의 앱 허용 정책을 확인한다. 외부 Testing 앱은 refresh token 만료 제한이 있으므로 서비스 운영 전에 게시 상태·검증 요구를 확인한다.
@@ -71,3 +71,7 @@ DB 크기는 `pg_database_size(current_database())`이며 WAL·시스템 파일�
 - 원래 곡의 Storage 상태와 파일 경로는 유지했다. Google 요청·음악 생성·실제 메일 발송은 하지 않았다. 검증 자료는 Git 제외 `artifacts/admin-live/`에 보관한다.
 - 실제 Advisors의 ERROR/WARN 없음. RLS 정책 없음 INFO는 서버 전용 설계이며, 미사용 인덱스 INFO는 아직 사용량이 적기 때문이다. [RLS 안내](https://supabase.com/docs/guides/database/database-linter?lint=0008_rls_enabled_no_policy), [인덱스 안내](https://supabase.com/docs/guides/database/database-linter?lint=0005_unused_index).
 - 검증 후 정확한 fixture ID와 `verification:admin:` 접두·삭제 상태를 확인해 검증용 음악 및 준비 기록을 정리했다. 최종 DB는 원래 음악·파일 각 1건, 직접 전달 기록·검증용 음악 각 0건이다. 원래 다운로드는 미소진 상태다.
+
+## 고객 완료 안내
+
+**고객 완료 안내 이력**은 직접 MP3 첨부 이력과 별도로 표시한다. 최초·재신청 완료 안내의 곡·차수·상태만 보여 주고 수신처·원본 페이지 토큰·암호문을 브라우저에 반환하지 않는다. 활성 여부는 Gmail 인증 설정과 별도로 표시한다. `sending`·`unknown`·`failed`는 자동 재발송하지 않는다. 등록·활성·운영 절차는 [완료 안내 운영](RESULT_EMAIL_OPERATIONS.md)을 따른다.

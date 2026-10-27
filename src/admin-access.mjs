@@ -7,7 +7,7 @@ const LIMIT = 67108864;
 const headers = { 'Cache-Control': 'no-store', 'Referrer-Policy': 'no-referrer', 'X-Content-Type-Options': 'nosniff' };
 const json = (value, status = 200) => Response.json(value, { status, headers });
 
-export function createAdminHandler({ backend, accessToken, mailer, sender = 'peter@humansyntax.kr', databaseCapacityBytes = null, storageCapacityBytes = null, clock = Date.now }) {
+export function createAdminHandler({ backend, accessToken, mailer, sender = 'peter@humansyntax.kr', databaseCapacityBytes = null, storageCapacityBytes = null, resultEmailEnabled = false, clock = Date.now }) {
   if (!/^[A-Za-z0-9_-]{43,128}$/.test(accessToken ?? '')) throw new Error('invalid_admin_configuration');
   for (const capacity of [databaseCapacityBytes, storageCapacityBytes]) {
     if (capacity !== null && (!Number.isSafeInteger(capacity) || capacity <= 0)) throw new Error('invalid_admin_configuration');
@@ -26,7 +26,7 @@ export function createAdminHandler({ backend, accessToken, mailer, sender = 'pet
       if (url.pathname === '/api/admin/dashboard' && request.method === 'GET') {
         const metrics = await backend.adminDashboard();
         return json({ ...metrics, databaseCapacityBytes, storageCapacityBytes,
-          integrations: { googleDrive: 'deferred', email: mailer ? 'configured' : 'not_configured', sender: mailer?.sender ?? sender, kakao: 'not_configured', payments: 'not_implemented' } });
+          integrations: { googleDrive: 'deferred', email: mailer ? 'configured' : 'not_configured', resultEmail: resultEmailEnabled ? 'enabled' : 'disabled', sender: mailer?.sender ?? sender, kakao: 'not_configured', payments: 'not_implemented' } });
       }
       if (url.pathname === '/api/admin/songs' && request.method === 'GET') {
         const offsetText = url.searchParams.get('offset') ?? '0';
@@ -37,6 +37,9 @@ export function createAdminHandler({ backend, accessToken, mailer, sender = 'pet
       }
       if (url.pathname === '/api/admin/history' && request.method === 'GET') {
         return json({ exports: await backend.adminHistory() });
+      }
+      if (url.pathname === '/api/admin/notifications' && request.method === 'GET') {
+        return json({ notifications: await backend.notificationHistory() });
       }
       const sending = url.pathname === '/api/admin/send-email';
       if (!['/api/admin/prepare', '/api/admin/send-email'].includes(url.pathname) || request.method !== 'POST') return json({ error: 'not_found' }, 404);

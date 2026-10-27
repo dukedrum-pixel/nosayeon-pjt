@@ -64,6 +64,13 @@ export function createStorageBackend({ url, serviceRoleKey, fetchImpl = globalTh
     return `/storage/v1/object/${BUCKET}/${path}`;
   }
   return {
+    configureSongEmail: ({ songId, tokenHash, recipient, sender, origin, sealedToken }) => jsonRequest('/rest/v1/rpc/configure_song_email', { method: 'POST',
+      json: { p_song_id: songId, p_token_hash: tokenHash, p_recipient: recipient, p_sender: sender, p_public_origin: origin, p_sealed_token: sealedToken } }),
+    notificationCandidates: limit => jsonRequest('/rest/v1/rpc/list_result_notification_candidates', { method: 'POST', json: { p_limit: limit } }),
+    beginResultNotification: (id, origin, sender) => jsonRequest('/rest/v1/rpc/begin_result_notification', { method: 'POST', json: { p_id: id, p_public_origin: origin, p_sender: sender } }),
+    finishResultNotification: (id, operationId, status, messageId, errorCode) => jsonRequest('/rest/v1/rpc/finish_result_notification', { method: 'POST',
+      json: { p_id: id, p_operation_id: operationId, p_status: status, p_message_id: messageId, p_error_code: errorCode } }),
+    notificationHistory: () => jsonRequest('/rest/v1/song_notification_outbox?select=id,song_id,delivery_version,event,status,created_at,started_at,completed_at,error_code&order=created_at.desc,id.desc&limit=50'),
     adminDashboard: () => jsonRequest('/rest/v1/rpc/read_admin_dashboard', { method: 'POST', json: {} }),
     adminSongs: (offset, id) => {
       if (!Number.isInteger(offset) || offset < 0 || offset > 9999999 || (id !== null && !/^[0-9a-f-]{36}$/.test(id))) throw new StorageError('local_error');
