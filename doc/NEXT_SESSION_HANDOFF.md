@@ -14,7 +14,7 @@
 
 - 주소: https://nosayeon-result-check.cw-lee.chatgpt.site
 - 기존 Site ID `appgprj_6ae116663f34819191c39fbf636cea68`를 재사용한다. 새 Site를 생성하지 않는다.
-- Site 소스 `be5e598a70fb4af15ba50c93e46dccf8adaa520f`, 배포 `appgdep_6ae1359b99b4819189e6e66a116b58da`, succeeded, env revision 2.
+- Site 소스 `4312077bddec06719a732c08cff258b03e4600c6`, 배포 `appgdep_6ae13808c2908191b9dc981bf8561baf`, succeeded, env revision 2.
 - access_mode=public. 이후 수정은 일반 save_site_version/deploy_site_version을 사용한다. 소유자 비공개 배포 도구를 사용하지 않는다.
 - Edge `nosayeon-result-api` v3 ACTIVE. 모든 고객 API는 Site 서버 전용 키를 추가로 요구한다.
 - 마이그레이션 `20261027233531_password_access_and_restore_queue.sql`까지 적용했다. 재적용하지 않는다.
@@ -23,11 +23,13 @@
 
 ## 최신 검증
 
-전체 테스트 138개 통과. 실제 복구 검증은 이미 다운로드·삭제된 테스트 곡 `72e5698a-188f-472d-a8c2-020091e559cd`에서 1회 진행했다. 원래 주소·토큰 유지, delivery_version=1, stored, consumed=null, 복구 queue succeeded, 새 차수 완료 안내 sent. 실제 음악 재생 후 다운로드 권한 보존을 확인했다. 이번 검증은 음악을 새로 생성하거나 다운로드를 소비하지 않았다.
+최신 전체 테스트 139개 통과. 실제 복구 검증은 이미 다운로드·삭제된 테스트 곡 `72e5698a-188f-472d-a8c2-020091e559cd`에서 1회 진행했다. 원래 주소·토큰 유지, delivery_version=1, stored, consumed=null, 복구 queue succeeded, 새 차수 완료 안내 sent. 실제 음악 재생 후 다운로드 권한 보존을 확인했다. 이번 검증은 음악을 새로 생성하거나 다운로드를 소비하지 않았다.
 
 브라우저 검증은 배포와 같은 Worker 코드를 로컬 라우팅하고 실제 원격 서비스를 연결했다. 클라우드의 Site 호스트 접속 제한으로 배포 사이트 자체를 브라우저로 검증한 것으로 주장하지 않는다. 네이티브 도구로 실제 배포 succeeded/public을 확인했다. Git 제외 `artifacts/password-restore-live/`에 안전한 보고서와 화면을 보관한다.
 
-현재 작업자는 `node --use-env-proxy scripts/song-request-worker.mjs` 프로세스(실행 세션 70779)다. **상시 운영 서버가 아니다.** heartbeat 60초 경과 시 신청을 비활성화한다. 재시작 전 기존 프로세스와 활성 신청·복구를 확인하고, 두 개를 중복 실행하지 않는다. 하루 총 3건·동시 신규 신청 1건 제한을 유지한다. 다음 독립적인 과제는 상시 작업자 호스팅이다. 사용자 요청 없이 실제 생성·복구·메일 테스트를 반복하지 않는다.
+현재 작업자는 detached Docker 컨테이너 `nosayeon-request-worker`다. 이전 대화 실행 세션 작업자는 종료됐고 heartbeat가 끊긴 원인이었다. `Dockerfile.request-worker`와 `scripts/start-request-worker-container.mjs`로 기존 인증/프록시/CA를 유지하면서 `unless-stopped`로 실행한다. 별도 실행에서도 running 및 실제 workerReady=true를 확인했다. 기존 컨테이너와 활성 작업을 확인하기 전에 같은 작업자를 추가하지 않는다. 로그/inspect 전체로 환경 값을 출력하지 말고 안전한 format만 사용한다.
+
+환경 자체 중지/프록시 세션 변경까지 보장하는 상시 운영 호스팅은 아니다. 하루 총 3건·동시 신규 신청 1건 제한을 유지한다. 사용자 요청 없이 실제 생성·복구·메일 테스트를 반복하지 않는다. 인증이 없는 구버전 탭/세션 만료는 신청 화면에서 사연을 유지한 채 비밀번호 재입력을 안내한다. 구버전 JS를 실행 중인 탭은 한 번 새로고침해야 한다.
 
 ## 구현 주의
 

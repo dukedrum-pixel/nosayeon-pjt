@@ -5,9 +5,9 @@
 - 신청 주소: https://nosayeon-result-check.cw-lee.chatgpt.site
 - 이름: 노사연 · 사연을 노래로
 - Site ID: `appgprj_6ae116663f34819191c39fbf636cea68`
-- Site 소스: `be5e598a70fb4af15ba50c93e46dccf8adaa520f`
-- 배포: `appgdep_6ae1359b99b4819189e6e66a116b58da`, succeeded, 환경 revision 2
-- 버전: `appgprj_6ae116663f34819191c39fbf636cea68~appgver_e124410ee51881918e827ac7ec83c815`
+- Site 소스: `4312077bddec06719a732c08cff258b03e4600c6`
+- 배포: `appgdep_6ae13808c2908191b9dc981bf8561baf`, succeeded, 환경 revision 2
+- 버전: `appgprj_6ae116663f34819191c39fbf636cea68~appgver_add9ed5fb42481919968779086ff0c57`
 - Supabase Edge Function: `nosayeon-result-api`, version 3, ACTIVE
 - 마이그레이션: `20261027224532 / song_request_pipeline`
 
@@ -81,3 +81,19 @@ HTML과 모든 고객 API에 같은 입장 권한을 적용한다. 결과 페이
 - 브라우저 검증은 배포와 동일한 Site Worker 코드를 로컬 라우팅하고 실제 Edge/Google/Storage/Gmail을 사용했다. 클라우드에서 Site 호스트 직접 접속은 제한돼 있으므로 배포 사이트 자체의 브라우저 검증과 구분한다. Sites 배포 succeeded와 public 설정을 네이티브 도구로 별도 확인했다.
 - 증거: Git 제외 `artifacts/password-restore-live/report.json`, `password-gate.png`, `restore-ready.png`, `restored-player.png`. 비공개 링크/쿠키/키를 증거 보고서에 기록하지 않았다.
 - 현재 작업자는 복구 대기열을 먼저 처리하고 신규 신청을 처리한다. 여전히 이 클라우드 프로세스가 켜져 있어야 하며 상시 운영 호스팅은 후속 과제다.
+
+## 신청 버튼 재발 수정 — 2026-10-27 23:47 UTC
+
+구버전 탭의 `/api/request/health`가 반복 401을 받는데도 재입장 안내를 하지 않았고, 대화 실행에 붙어 있던 작업자가 종료돼 heartbeat도 stale이었다. 비밀번호 이전 탭과 세션 만료는 작성한 사연을 유지하는 인라인 비밀번호 창으로 복구한다. 인증 복구 후 읽기 전용 상태 확인만 재개하며 신청 POST를 자동 반복하지 않는다. 상태 요청에 20초 제한을 추가했다.
+
+음악 처리 작업자는 `nosayeon-request-worker`라는 detached Docker 컨테이너로 전환했다. `unless-stopped` 재시작 정책, non-root/read-only/cap-drop, 프로세스·메모리·로그 제한을 적용했다. 앱 설정은 기존 private runtime.json을 읽기 전용 마운트하고, 환경 인증은 기존 프록시와 CA를 사용한다. 이미지/소스에 키를 넣지 않는다. 작업자의 Google 생성/복구/메일 중복 방지 정책은 그대로다. **재시작은 프로세스 재시작이며 이미 점유된 작업의 재생성·재발송은 아니다.**
+
+```sh
+BUILDX_CONFIG=/tmp/nosayeon-buildx docker build -f Dockerfile.request-worker -t nosayeon-request-worker:current .
+node scripts/start-request-worker-container.mjs
+docker inspect --format '{{.State.Status}} restart={{.HostConfig.RestartPolicy.Name}}' nosayeon-request-worker
+```
+
+기존 컨테이너/작업자가 있으면 런처는 새 작업자를 만들지 않는다. 코드 업데이트 시 활성 작업·큐를 확인하고 안전하게 기존 컨테이너를 중지·교체한다. 환경 자체가 중지되거나 프록시/Secret 세션이 바뀌면 가용성을 보장하지 않는다. 독립적인 상시 호스팅은 아직 후속 과제다.
+
+검증: 전체 139개 통과. 별도 실행 호출에서도 컨테이너가 running으로 유지되고, 배포와 동일한 Site Worker의 실제 Edge health가 HTTP 200/enabled=true/workerReady=true였다. 이번 수정에서 새 음악·복구·메일 요청은 만들지 않았다. 배포 succeeded. 기존에 열어둔 구버전 탭은 한 번 새로고침한다.

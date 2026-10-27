@@ -16,7 +16,7 @@ function setup(fetchImpl){
  el('request-form').querySelectorAll=selector=>selector==='select'?[]:[el('story'),el('submit-request')];
  const location=new URL('https://example.com/');
  const context={document:{getElementById:el,querySelectorAll:()=>steps,addEventListener(){},hidden:false},window:{addEventListener(){}},location,
-  history:{replaceState(_,__,value){const next=new URL(value,location);location.href=next.href;}},fetch:fetchImpl,URL,URLSearchParams,crypto,
+  history:{replaceState(_,__,value){const next=new URL(value,location);location.href=next.href;}},fetch:fetchImpl,URL,URLSearchParams,crypto,AbortSignal,
   setTimeout(fn,ms){const id=++sequence;timers.set(id,{fn,ms});return id;},clearTimeout(id){timers.delete(id);}};
  vm.runInNewContext(source,context);
  const flush=async()=>{for(let i=0;i<12;i++)await Promise.resolve();};
@@ -45,4 +45,17 @@ test('a delayed readiness response cannot unlock a submitted request or reset it
  });
  await page.flush();const pending=page.run(5000);await page.flush();await page.submit();release();await pending;
  assert.equal(page.el('submit-request').disabled,true);assert.equal(page.steps[1].classes.has('is-current'),true);
+});
+
+test('an open page recovers from missing password session without losing the story or auto-submitting',async()=>{
+ let authenticated=false,posts=0;
+ const page=setup(async(path,init)=>{
+  if(path==='/api/session/login'){authenticated=true;return Response.json({status:'authenticated'});}
+  if(init?.method==='POST')posts++;
+  return authenticated?Response.json({enabled:true,workerReady:true}):Response.json({error:'unauthorized'},{status:401});
+ });
+ await page.flush();assert.equal(page.el('session-gate').hidden,false);assert.equal(page.el('submit-request').disabled,true);
+ page.el('story').value='작성 중인 사연';page.el('session-password').value='test-password';
+ await page.el('session-form').handlers.submit({preventDefault(){}});await page.flush();
+ assert.equal(page.el('session-gate').hidden,true);assert.equal(page.el('submit-request').disabled,false);assert.equal(page.el('story').value,'작성 중인 사연');assert.equal(posts,0);assert.equal(page.el('session-password').value,'');
 });
