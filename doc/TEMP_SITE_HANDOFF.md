@@ -23,3 +23,7 @@
 ## 배포 환경 메모
 
 이 클라우드 환경에는 Sites 스킬에 설명된 source helper 실행 파일이 없어, 동일한 소스 저장소 자격증명을 메모리/숨긴 stdin으로만 전달해 Git push 후 정적 산출물을 묶었다. Git 자격증명을 인자·환경 파일·Git 설정에 영구 저장하지 않았다. 아카이브에는 `.openai/hosting.json`과 선언된 `dist/`만 포함한다.
+
+## 현재 상태 변경
+
+사용자가 실제 신청 전체 흐름을 승인해 기존 Site를 Worker 앱으로 전환했다. 루트는 사연 신청 페이지이며 /result.html은 실제 Edge API에 연결한다. 이전 정적 화면 미리보기 전용 설명은 과거 상태다. 이름은 **노사연 · 사연을 노래로**, 주소는 기존 메일 링크 보존을 위해 유지했다. 최신 배포·검증·클라우드 작업자 제약은 [SONG_REQUEST_OPERATIONS.md](SONG_REQUEST_OPERATIONS.md)를 따른다.

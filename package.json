@@ -21,7 +21,9 @@
     "notification:preview": "node scripts/preview-result-email.mjs",
     "notification:configure": "node --use-env-proxy scripts/configure-result-email.mjs",
     "notification:deliver": "node --use-env-proxy scripts/deliver-result-notifications.mjs",
-    "result:public": "node --use-env-proxy scripts/public-result-server.mjs"
+    "result:public": "node --use-env-proxy scripts/public-result-server.mjs",
+    "requests:worker": "node --use-env-proxy scripts/song-request-worker.mjs",
+    "requests:site-build": "node scripts/build-request-site.mjs"
   },
   "devDependencies": {
     "@electric-sql/pglite": "0.5.12"

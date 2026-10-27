@@ -35,3 +35,9 @@ Supabase 실제 프로젝트에 DB 마이그레이션과 비공개 버킷 구성
 `npm run notification:preview`로 실제 발송 없이 최초·재신청 완료 메일을 확인합니다. `notification:configure`는 기존 비공개 결과 링크의 수신처와 암호화 토큰을 등록하며, `notification:deliver`는 명시적 실행 옵션과 활성 설정이 모두 있을 때만 신규 대기 건을 처리합니다. 곡·차수마다 한 번 점유하고 `failed`·`sending`·`unknown`은 자동 재발송하지 않습니다. [완료 안내 운영](doc/RESULT_EMAIL_OPERATIONS.md)을 참고하세요.
 
 `npm run result:public`과 `Dockerfile`은 관리자 기능을 제외한 고객 결과 서버용입니다. 현재는 외부 배포 전이며 HTTPS 프록시·공개 원점·서버 Secret 설정이 필요합니다. [배포 준비](doc/RESULT_DEPLOYMENT.md), [다음 작업 인계](doc/NEXT_SESSION_HANDOFF.md)에 현재 상태를 기록합니다.
+
+### 실제 사연 신청 테스트
+
+[노사연 · 사연을 노래로](https://nosayeon-result-check.cw-lee.chatgpt.site)에서 사연·음악 옵션을 작성하고 신청하면 신규 음악을 생성·비공개 저장하고 `dukedrum@gmail.com`으로 결과 페이지 링크를 보냅니다. 현재 소유자 비공개 테스트이며 하루 3건·동시 처리 1건으로 제한합니다. 중복 클릭이나 응답 손실로 새 음악을 자동 재생성하지 않습니다.
+
+현재 Google/Gmail 인증이 준비된 개발용 클라우드 작업자가 처리합니다. 작업자가 실행 중일 때만 신규 신청이 활성화되며, 환경이 중지되면 상시 처리는 보장되지 않습니다. `npm run requests:worker`로 기존 비공개 런타임 설정을 사용하는 작업자를 시작할 수 있습니다. 새 음악 생성 1회·Gmail 접수·새 결과 페이지의 실제 재생을 검증했습니다. 자세한 상태는 [신청 처리 운영](doc/SONG_REQUEST_OPERATIONS.md)에 기록합니다.

@@ -1,5 +1,7 @@
 # 고객 API 연결 준비 및 배포 확인
 
+**최신 상태:** 사용자가 신규 신청·생성·결과 메일·재생/다운로드까지 한 번에 진행하도록 명시적으로 승인했다. 해당 API는 version 2로 배포했고 실제 생성·발송·재생을 검증했다. 아래 승인 대기는 과거 기록이다. 현재 운영은 [SONG_REQUEST_OPERATIONS.md](SONG_REQUEST_OPERATIONS.md)를 따른다.
+
 ## 준비 결과
 
 기존 Supabase 프로젝트에 `nosayeon-result-api` Edge Function을 추가하는 코드를 준비했다. 기존 고객 권한 검증·원본 해시 검증·1회 다운로드·삭제 처리를 재사용한다. 브라우저는 기존 고정 링크의 fragment에서 토큰을 읽고 Authorization 헤더로 API에 전달한다. 토큰을 query에 넣거나 새 사이트 소스에 저장하지 않는다.

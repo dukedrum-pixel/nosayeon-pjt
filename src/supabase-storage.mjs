@@ -64,6 +64,13 @@ export function createStorageBackend({ url, serviceRoleKey, fetchImpl = globalTh
     return `/storage/v1/object/${BUCKET}/${path}`;
   }
   return {
+    requestReadiness: hash => jsonRequest('/rest/v1/rpc/song_request_readiness',{method:'POST',json:{p_ingress_hash:hash}}),
+    submitRequest: (id,prompt,hash,sealed,ingress) => jsonRequest('/rest/v1/rpc/submit_song_request',{method:'POST',json:{p_id:id,p_prompt:prompt,p_token_hash:hash,p_sealed_token:sealed,p_ingress_hash:ingress}}),
+    readRequest: (id,hash) => jsonRequest('/rest/v1/rpc/read_song_request',{method:'POST',json:{p_id:id,p_ingress_hash:hash}}),
+    touchRequestWorker: () => jsonRequest('/rest/v1/rpc/touch_song_request_worker',{method:'POST',json:{}}),
+    claimRequest: () => jsonRequest('/rest/v1/rpc/claim_song_request',{method:'POST',json:{}}),
+    progressRequest: (id,status,interaction=null,songId=null) => jsonRequest('/rest/v1/rpc/progress_song_request',{method:'POST',json:{p_id:id,p_status:status,p_interaction_id:interaction,p_song_id:songId}}),
+    requestNotification: async songId => (await jsonRequest(`/rest/v1/song_notification_outbox?song_id=eq.${songId}&select=id,status&order=created_at.desc&limit=1`))[0],
     configureSongEmail: ({ songId, tokenHash, recipient, sender, origin, sealedToken }) => jsonRequest('/rest/v1/rpc/configure_song_email', { method: 'POST',
       json: { p_song_id: songId, p_token_hash: tokenHash, p_recipient: recipient, p_sender: sender, p_public_origin: origin, p_sealed_token: sealedToken } }),
     notificationCandidates: limit => jsonRequest('/rest/v1/rpc/list_result_notification_candidates', { method: 'POST', json: { p_limit: limit } }),
