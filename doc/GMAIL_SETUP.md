@@ -1,8 +1,10 @@
-# Gmail 가계정 연결 순서
+# Gmail 가계정 연결 순서 — 로컬 방식 참고용
+
+> 2026-10-27 사용자 선택: PC 설치·로컬 실행 없이 온라인에서만 테스트한다. 현재 진행 순서는 [Gmail 온라인 테스트 안내](GMAIL_ONLINE_SETUP.md)를 따른다. 아래 Desktop 절차는 선택적인 로컬 도구 기록이며 지금 실행할 필요가 없다.
 
 발신 계정: **peter@humansyntax.kr**. 사용자가 지정한 첨부 테스트 수신처: **dukedrum@gmail.com**.
 
-OAuth 클라이언트가 아직 없고 현재 Cloud 환경에도 Gmail 인증값과 필요한 호스트가 없다. 연결 도구와 모의 검증은 준비했지만 Google 계정 로그인·동의와 실제 메일 발송은 아직 하지 않았다. Gemini API 키나 ChatGPT Gmail 연결을 서비스 서버의 인증으로 대신하지 않는다.
+사용자는 Google Cloud 최초 설정을 완료했다고 알렸다. 현재 Cloud 실행환경에는 Gmail 인증값과 필요한 호스트가 아직 등록되지 않았다. 연결 도구와 모의 검증은 준비했지만 Google 계정 로그인·동의와 실제 메일 발송은 아직 하지 않았다. Gemini API 키나 ChatGPT Gmail 연결을 서비스 서버의 인증으로 대신하지 않는다.
 
 ## 1. Google Cloud에서 최초 설정
 
