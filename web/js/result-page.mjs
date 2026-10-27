@@ -1,6 +1,9 @@
+import { resultApiUrl } from './result-api.mjs';
 import { buildResultView } from './result-state.mjs';
 import { setupResultPlayer, updateResultStatus } from './result-player.mjs';
 
+const apiBase = document.querySelector('meta[name="result-api-base"]')?.content || '';
+const api = path => resultApiUrl(path, apiBase);
 const player = document.querySelector('#result-audio');
 const play = document.querySelector('#result-play');
 const select = document.querySelector('#result-file');
@@ -53,7 +56,7 @@ function render(value) {
 async function load() {
   if (!/^[0-9a-f-]{36}$/.test(id ?? '') || !/^[A-Za-z0-9_-]{43}$/.test(token ?? '')) { render({ status: 'invalid_link' }); return; }
   try {
-    const response = await fetch(`/api/result?id=${encodeURIComponent(id)}`, {
+    const response = await fetch(api(`/api/result?id=${encodeURIComponent(id)}`), {
       headers: { Authorization: `Bearer ${token}` }, cache: 'no-store', credentials: 'omit', redirect: 'error', signal: AbortSignal.timeout(20000),
     });
     const data = await response.json();
@@ -85,7 +88,7 @@ play.addEventListener('click', async () => {
   try {
     const file = snapshot.files.find(file => file.index === Number(select.value));
     if (!file) throw new Error();
-    const response = await fetch(`/api/audio?id=${encodeURIComponent(id)}&file=${file.index}&version=${snapshot.deliveryVersion??0}`, {
+    const response = await fetch(api(`/api/audio?id=${encodeURIComponent(id)}&file=${file.index}&version=${snapshot.deliveryVersion??0}`), {
       headers: { Authorization: `Bearer ${token}` }, cache: 'no-store', credentials: 'omit', redirect: 'error', signal: controller.signal,
     });
     if (!response.ok) { const state=await response.json();if(state.status==='stale')await load();else render(state);return; }
@@ -111,7 +114,7 @@ download.addEventListener('click', async () => {
   downloadMessage.textContent = '다운로드를 준비하고 있습니다.';
   try {
     const files = snapshot.files;
-    const response = await fetch(`/api/download?id=${encodeURIComponent(id)}&version=${snapshot.deliveryVersion??0}`, {
+    const response = await fetch(api(`/api/download?id=${encodeURIComponent(id)}&version=${snapshot.deliveryVersion??0}`), {
       method: 'POST', headers: { Authorization: `Bearer ${token}` }, cache: 'no-store', credentials: 'omit', redirect: 'error', signal: controller.signal,
     });
     if (!response.ok) throw new Error();
@@ -148,7 +151,7 @@ restore.addEventListener('click',async()=>{
   audioPending?.abort();clearAudio();restoreMessage.textContent='기존 다운로드를 종료하고 같은 음악을 다시 준비하고 있습니다.';
   render({status:'processing'});
   try{
-    await fetch(`/api/restore?id=${encodeURIComponent(id)}&version=${version}`,{method:'POST',headers:{Authorization:`Bearer ${token}`},credentials:'omit',cache:'no-store',redirect:'error',signal:AbortSignal.timeout(600000)});
+    await fetch(api(`/api/restore?id=${encodeURIComponent(id)}&version=${version}`),{method:'POST',headers:{Authorization:`Bearer ${token}`},credentials:'omit',cache:'no-store',redirect:'error',signal:AbortSignal.timeout(600000)});
   }catch{}
   finally{
     restoring=false;await load();

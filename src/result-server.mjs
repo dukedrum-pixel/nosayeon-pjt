@@ -13,13 +13,13 @@ const staticFiles = new Map([
   ['/js/admin.mjs', ['js/admin.mjs', 'text/javascript']],
   ['/styles.css', ['styles.css', 'text/css']],
   ['/result.css', ['result.css', 'text/css']],
-  ...['app', 'prompt-builder', 'result-state', 'result-preview', 'result-page', 'result-player'].map(name =>
+  ...['app', 'prompt-builder', 'result-state', 'result-preview', 'result-page', 'result-player', 'result-api'].map(name =>
     [`/js/${name}.mjs`, [`js/${name}.mjs`, 'text/javascript']]),
 ]);
 
 export function createResultServer({ handler, adminHandler, publicOrigin = null, afterDownloadResponse = async () => {}, webRoot = new URL('../web/', import.meta.url) }) {
   const publishedOrigin = publicOrigin === null ? null : publicResultOrigin(publicOrigin);
-  const publicFiles = new Set(['/result.html', '/result.css', '/styles.css', '/js/result-page.mjs', '/js/result-player.mjs', '/js/result-state.mjs']);
+  const publicFiles = new Set(['/result.html', '/result.css', '/styles.css', '/js/result-page.mjs', '/js/result-player.mjs', '/js/result-state.mjs', '/js/result-api.mjs']);
   return createServer(async (req, res) => {
     const safeHeaders = { 'Cache-Control': 'no-store', 'Referrer-Policy': 'no-referrer', 'X-Content-Type-Options': 'nosniff',
       'Permissions-Policy': 'camera=(), microphone=(), geolocation=()',
