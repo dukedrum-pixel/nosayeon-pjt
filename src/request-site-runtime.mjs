@@ -16,7 +16,7 @@ export function createRequestSite({assets,origin,edgeBase,fetchImpl=fetch}){
  const headers={'Cache-Control':'no-store','Referrer-Policy':'no-referrer','X-Content-Type-Options':'nosniff',
  'Content-Security-Policy':"default-src 'self'; connect-src 'self' https://fuvgpqkyhuyanbfavwcg.supabase.co; media-src blob:; object-src 'none'; base-uri 'none'; form-action 'none'"};
  const json=(body,status=200)=>Response.json(body,{status,headers});
- return {async fetch(request,env){
+ return {async fetch(request,env={},ctx={}){
   const url=new URL(request.url);
   if(url.origin!==origin)return json({error:'forbidden'},403);
   if(!url.pathname.startsWith('/api/request/')){
@@ -29,8 +29,13 @@ export function createRequestSite({assets,origin,edgeBase,fetchImpl=fetch}){
   const signedVisitor=typeof visitor==='string'&&visitor.length>0&&visitor.length<=256;
   if(!signedVisitor&&!service)return json({error:'unauthorized'},401);
   if(request.headers.get('Origin')&&request.headers.get('Origin')!==origin)return json({error:'forbidden'},403);
-  if(!env.REQUEST_INGRESS_KEY||!env.REQUEST_ENCRYPTION_KEY)return json({error:'not_configured'},503);
-  async function edge(path,init={}){return fetchImpl(`${edgeBase}${path}`,{...init,redirect:'error',headers:{'x-request-secret':env.REQUEST_INGRESS_KEY,...init.headers},signal:AbortSignal.timeout(30000)});}
+  if(!env.REQUEST_INGRESS_KEY||!env.REQUEST_ENCRYPTION_KEY){console.warn('request_health_configuration',JSON.stringify({ingressBound:Boolean(env.REQUEST_INGRESS_KEY),encryptionBound:Boolean(env.REQUEST_ENCRYPTION_KEY),envKeys:Object.keys(env),contextKeys:Object.keys(ctx),propertyKeys:Object.keys(ctx.props??{})}));return json({error:'not_configured'},503);}
+  async function edge(path,init={}){
+   // Workers supports follow/manual. Reject redirects explicitly to keep the secret on its intended host.
+   const response=await fetchImpl(`${edgeBase}${path}`,{...init,redirect:'manual',headers:{'x-request-secret':env.REQUEST_INGRESS_KEY,...init.headers},signal:AbortSignal.timeout(30000)});
+   if(response.status>=300&&response.status<400){await response.body?.cancel();throw new Error('upstream_redirect_rejected');}
+   return response;
+  }
   async function safeState(row){
    const state={id:row.id,status:row.status,errorCode:row.errorCode};
    if(uuid(row.songId)){
@@ -39,9 +44,10 @@ export function createRequestSite({assets,origin,edgeBase,fetchImpl=fetch}){
    }
    return state;
   }
+  let failurePhase='request';
   try{
    if(url.pathname==='/api/request/health'&&request.method==='GET'){
-    const r=await edge('/intake/health');if(!r.ok)throw new Error();const state=await r.json();return json({enabled:state.enabled===true,workerReady:state.workerReady===true});
+    failurePhase='health_fetch';const r=await edge('/intake/health');if(!r.ok){console.warn('request_health_upstream_status',r.status);return json({error:'upstream_unavailable'},503);}failurePhase='health_decode';const state=await r.json();failurePhase='health_format';return json({enabled:state.enabled===true,workerReady:state.workerReady===true});
    }
    if(url.pathname==='/api/request/status'&&request.method==='GET'){
     const id=url.searchParams.get('id');if(!uuid(id))return json({error:'invalid_request'},400);
@@ -61,6 +67,6 @@ export function createRequestSite({assets,origin,edgeBase,fetchImpl=fetch}){
    const r=await edge('/intake/submit',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
    const state=await r.json();if(!r.ok)return json({error:state.result||state.error||'unavailable'},r.status);
    return json({id:body.id,status:state.status});
-  }catch{return json({error:'unavailable'},503);}
+  }catch(error){console.warn('request_api_connection_failed',JSON.stringify({route:url.pathname,phase:failurePhase,type:error?.name}));return json({error:'unavailable'},503);}
  }};
 }

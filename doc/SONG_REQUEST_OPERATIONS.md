@@ -5,9 +5,9 @@
 - 신청 주소: https://nosayeon-result-check.cw-lee.chatgpt.site
 - 이름: 노사연 · 사연을 노래로
 - Site ID: `appgprj_6ae116663f34819191c39fbf636cea68`
-- Site 소스: `e62373728c00a9fb5fa2f74e55240a9c9f797e6f`
-- 배포: `appgdep_6ae12b8141488191b985f96e86b3ee9a`, succeeded, 환경 revision 1
-- 버전: `appgprj_6ae116663f34819191c39fbf636cea68~appgver_06bf73a32b8c81919b73c683ea54c42f`
+- Site 소스: `bc886b861553cdf4b9928ca94c96de5b0b1f3a13`
+- 배포: `appgdep_6ae12ee860d881919944ee81c4b299e0`, succeeded, 환경 revision 1
+- 버전: `appgprj_6ae116663f34819191c39fbf636cea68~appgver_82a388d0e8c48191a97eba97d378d4a3`
 - Supabase Edge Function: `nosayeon-result-api`, version 2, ACTIVE
 - 마이그레이션: `20261027224532 / song_request_pipeline`
 
@@ -57,3 +57,13 @@ Site의 플랫폼 사용자 ID는 Site별로 다른 pairwise ID이므로 계정 
 - 이후 DB에는 22:51:54 UTC의 별도 다운로드 소비와 음원 삭제 완료가 기록됐다. 이 요청의 주체나 파일 저장 완료까지 자동 검증으로 주장하지 않는다. 이미 소비된 새 곡을 자동 복구·재생성하지 않았다.
 - 기존 곡 `c7ed78ea-453a-41ce-84cd-ad185a031f3b`는 stored, consumed=false로 유지했다.
 - 증거는 Git 제외 `artifacts/song-request-live/`, 자동 테스트 로그는 `artifacts/continuation/request-tests.log`에 있다. 링크 토큰이 들어간 private state.json은 출력하거나 Git에 넣지 않는다.
+
+## 신청 버튼 및 진행 단계 수정
+
+실제 Site Worker 로그에서 `/api/request/health`가 503으로 실패하는 원인을 확인했다. Cloudflare Workers는 `fetch(..., {redirect:'error'})`를 지원하지 않아 백엔드 호출 자체가 TypeError로 실패했다. Sites 서버 호출만 `redirect:'manual'`로 변경하고 모든 3xx를 명시적으로 거부해 접수 Secret이 다른 호스트로 전달되지 않게 했다. Node/Deno의 기존 호출 정책은 바꾸지 않았다.
+
+초기 상태 확인이 실패하면 신청 버튼이 계속 비활성으로 남던 문제도 수정했다. 5초마다 읽기 전용 상태 확인을 재시도하고, 페이지가 다시 보일 때도 확인한다. 늦게 도착한 상태 응답이 이미 제출한 신청의 잠금을 풀거나 진행 상태를 덮어쓰지 않는다.
+
+하단 4개 단계는 현재 단계 하나만 1.5초 주기로 깜빡이고 이전 단계는 체크 표시, 완료/실패 후에는 깜빡임을 멈춘다. 현재 단계에 aria-current=step을 적용하고 애니메이션 줄이기 설정에서는 고정 강조로 표시한다.
+
+자동 테스트 135개 통과. 실제 배포 로그에서 수정 직후 `/api/request/health`의 연속 HTTP 200 응답을 확인했고, DB의 enabled/worker_ready 모두 true, 신청 건수는 1건 그대로였다. 이번 수정 검증에서 실제 음악·추가 메일을 생성하지 않았다.

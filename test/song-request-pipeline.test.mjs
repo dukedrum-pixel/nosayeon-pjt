@@ -62,3 +62,17 @@ test('request SQL is service-only, claim-once, idempotent and keeps offline/dupl
   for(const role of ['anon','authenticated']){assert.equal((await db.query("select has_table_privilege($1,'public.song_requests','SELECT') allowed",[role])).rows[0].allowed,false);}
  }finally{await db.close();}
 });
+
+
+test('Site uses supported manual redirects and never forwards the request secret to a redirect target',async()=>{
+ let calls=0,redirect=false;
+ const site=createRequestSite({assets:{},origin,edgeBase:'https://edge.example.com',fetchImpl:async(url,init)=>{
+  calls++;if(init.redirect!=='manual')throw new TypeError('Unsupported redirect mode at edge');
+  assert.equal(url,'https://edge.example.com/intake/health');
+  return redirect?new Response(null,{status:302,headers:{Location:'https://other.example.com'}}):Response.json({enabled:true,workerReady:true});
+ }});
+ const request=()=>new Request(origin+'/api/request/health',{headers:{'oai-authenticated-user-id':'site-visitor'}});
+ const env={REQUEST_INGRESS_KEY:'i'.repeat(43),REQUEST_ENCRYPTION_KEY:key};
+ assert.equal((await site.fetch(request(),env)).status,200);
+ redirect=true;assert.equal((await site.fetch(request(),env)).status,503);assert.equal(calls,2);
+});
