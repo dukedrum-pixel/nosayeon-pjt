@@ -5,17 +5,17 @@
 - 신청 주소: https://nosayeon-result-check.cw-lee.chatgpt.site
 - 이름: 노사연 · 사연을 노래로
 - Site ID: `appgprj_6ae116663f34819191c39fbf636cea68`
-- Site 소스: `bc886b861553cdf4b9928ca94c96de5b0b1f3a13`
-- 배포: `appgdep_6ae12ee860d881919944ee81c4b299e0`, succeeded, 환경 revision 1
-- 버전: `appgprj_6ae116663f34819191c39fbf636cea68~appgver_82a388d0e8c48191a97eba97d378d4a3`
-- Supabase Edge Function: `nosayeon-result-api`, version 2, ACTIVE
+- Site 소스: `be5e598a70fb4af15ba50c93e46dccf8adaa520f`
+- 배포: `appgdep_6ae1359b99b4819189e6e66a116b58da`, succeeded, 환경 revision 2
+- 버전: `appgprj_6ae116663f34819191c39fbf636cea68~appgver_e124410ee51881918e827ac7ec83c815`
+- Supabase Edge Function: `nosayeon-result-api`, version 3, ACTIVE
 - 마이그레이션: `20261027224532 / song_request_pipeline`
 
 사용자는 신규 사연을 입력하고 신청하면 실제 음악이 생성되고 dukedrum@gmail.com으로 결과 페이지 링크가 전송되며 음악 재생·다운로드가 되는 수준까지 진행하라고 명시적으로 승인했다. 기존 복구를 신규 생성으로 대체하는 금지는 유지한다. 이번 신규 생성은 기존 곡 복구와 별개다.
 
 ## 흐름
 
-1. 소유자 비공개 Site에서 사연·옵션을 입력하고 노래 신청하기를 누른다. 수신처는 dukedrum@gmail.com으로 고정된다.
+1. ChatGPT 로그인 없이 Site에서 입장 비밀번호를 입력한 뒤 사연·옵션을 입력하고 노래 신청하기를 누른다. 수신처는 dukedrum@gmail.com으로 고정된다.
 2. Site 서버가 제출 내용을 검증하고, 새 페이지 토큰을 생성해 AES-256-GCM으로 암호화한다. 브라우저에 원본 토큰이나 서버 키를 요구하지 않는다.
 3. 서버 전용 접수 키로 Edge API에 접수한다. Edge API는 서버에서 프롬프트를 구성하고 RLS가 적용된 서비스 전용 DB에 접수한다. 새 접수 키는 Google/Gmail 인증값과 별개이고, DB에는 접수 키 해시만 있다.
 4. 클라우드 작업자는 DB에서 한 번만 점유한 신청에 Google 생성 POST를 정확히 한 번 수행한다. Interaction ID를 받은 뒤 먼저 체크포인트를 기록한다. 이후에는 동일 Interaction GET만 가능하며 결과 불명 시 자동 새 생성하지 않는다.
@@ -33,11 +33,13 @@ Site의 `REQUEST_INGRESS_KEY`, `REQUEST_ENCRYPTION_KEY`는 새로 만든 앱 전
 npm run requests:worker
 ```
 
-작업자는 시작할 때 Gmail 토큰 갱신·발신 계정 일치를 확인하고 10초마다 heartbeat를 기록한다. heartbeat가 60초 넘게 끊기면 신규 신청 버튼이 비활성화된다. 하루 최대 3건, 동시 활성 신청 1건이다. 이는 현재 계정 소유자만 쓰는 개발 테스트 제한이다.
+작업자는 시작할 때 Gmail 토큰 갱신·발신 계정 일치를 확인하고 10초마다 heartbeat를 기록한다. heartbeat가 60초 넘게 끊기면 신규 신청 버튼이 비활성화된다. 하루 최대 3건, 동시 활성 신청 1건이다. 이는 공용 입장 비밀번호를 아는 테스트 이용자 전체에 적용되는 제한이다.
 
 **상시 운영 서버는 아직 아니다.** 현재 클라우드 환경과 작업자 프로세스가 살아 있을 때 처리한다. 환경 중지·프로세스 종료 뒤에도 DB 접수·상태는 보존하지만 자동 재기동/24시간 가용성을 보장하지 않는다. 장기 운영에는 Google/Gmail 인증이 준비된 상시 작업자 호스팅을 마련해야 한다.
 
-Site의 플랫폼 사용자 ID는 Site별로 다른 pairwise ID이므로 계정 ID와 비교하지 않는다. 소유자 비공개 Site의 플랫폼 접근 제어를 유지하고, 플랫폼이 공급한 로그인 사용자 또는 이중으로 보호된 서비스 호출만 허용한다. 접근 대상을 public으로 변경하기 전에 별도 사용자 인증과 비용 제한을 다시 설계해야 한다. 서비스 자동 검증에는 기존 Sites 서비스 액세스 및 별도 접수 Secret을 사용하며, 사용자 ID를 위조하지 않는다.
+Site 접근 모드는 사용자의 명시적 요청에 따라 `public`이다. 플랫폼 로그인 대신 서버에서 입장 비밀번호를 검증한다. Site의 `SITE_PASSWORD`, `SITE_SESSION_KEY`는 Secret이다. 원문 비밀번호를 소스·Git·문서에 기록하지 않는다. 로그인 성공 시 8시간짜리 Secure/HttpOnly/SameSite=Lax HMAC 쿠키를 발급한다. 비밀번호나 서명 키를 바꾸면 기존 세션은 무효다. 잘못된 시도 5회/10분은 5분 차단하며, DB에는 IP 원문 대신 HMAC 식별자만 저장한다.
+
+HTML과 모든 고객 API에 같은 입장 권한을 적용한다. 결과 페이지는 같은 원점의 Site 서버를 통해 Edge에 접속하며, 플랫폼 사용자 헤더로 입장 권한을 대체하지 않는다. Edge의 `/api/*` 직접 호출도 앱 전용 접수 키 없이는 차단한다. 고객의 결과 토큰은 이와 별도로 계속 필요하다. 로그인은 결과 페이지의 원래 URL에서 처리해 `#token`을 유지한다. 비밀번호 변경 전부터 열어 둔 탭이나 세션 만료 시 페이지를 새로고침하고 입장한다.
 
 ## 상태와 재처리
 
@@ -67,3 +69,15 @@ Site의 플랫폼 사용자 ID는 Site별로 다른 pairwise ID이므로 계정 
 하단 4개 단계는 현재 단계 하나만 1.5초 주기로 깜빡이고 이전 단계는 체크 표시, 완료/실패 후에는 깜빡임을 멈춘다. 현재 단계에 aria-current=step을 적용하고 애니메이션 줄이기 설정에서는 고정 강조로 표시한다.
 
 자동 테스트 135개 통과. 실제 배포 로그에서 수정 직후 `/api/request/health`의 연속 HTTP 200 응답을 확인했고, DB의 enabled/worker_ready 모두 true, 신청 건수는 1건 그대로였다. 이번 수정 검증에서 실제 음악·추가 메일을 생성하지 않았다.
+
+## 최신: 비밀번호 입장과 실제 재신청
+
+- 마이그레이션 `20261027233531 / password_access_and_restore_queue` 적용. 비밀번호 시도 제한과 복구 대기열은 RLS 서비스 전용이다.
+- 결과 화면의 **다운로드 다시 신청** 버튼이 Site → Edge → DB 대기열 → 클라우드 작업자에 연결됐다. 복구 중에는 다운로드를 점유하지 못하며 새로고침해도 준비 상태를 계속 확인한다.
+- 작업자는 기존 Interaction을 GET으로 조회하고 원본의 바이트 수·SHA-256을 검증한다. 새 음악 생성 API를 호출하지 않는다. 기존 주소·토큰을 유지하고 다운로드 차수를 늘려 7일/1회 권한을 준비한다. 생성 후 50일 이내 재신청 정책을 유지한다.
+- 재신청 완료 시 새 차수의 완료 안내 메일을 한 번 접수한다. 실패/불명 메일과 점유한 복구 작업을 자동 반복하지 않는다. 처리 중 복구가 15분을 넘으면 다음 명시적 신청에서만 실패로 정리하고 다시 접수할 수 있다.
+- 2026-10-27 23:37:56 UTC: 이미 소비·삭제된 테스트 곡 `72e5698a-188f-472d-a8c2-020091e559cd`로 실제 재신청 POST 1회를 수행했다. version 0 → 1, stored, consumed=null, queue succeeded, 완료 안내 sent. 검증에서 추가 음악 생성이나 다운로드 소비는 없었다.
+- Chromium 390px에서 비밀번호 입장 → 원래 결과 토큰 유지 → 재신청 버튼 → 202/처리 중 → 준비 완료 → 실제 음악 재생을 확인했다. 다운로드 버튼은 사용 가능하고 브라우저 예외는 0건이었다. 테스트 전체 138개 통과. Edge 직접 호출 우회도 실제 401로 차단했다.
+- 브라우저 검증은 배포와 동일한 Site Worker 코드를 로컬 라우팅하고 실제 Edge/Google/Storage/Gmail을 사용했다. 클라우드에서 Site 호스트 직접 접속은 제한돼 있으므로 배포 사이트 자체의 브라우저 검증과 구분한다. Sites 배포 succeeded와 public 설정을 네이티브 도구로 별도 확인했다.
+- 증거: Git 제외 `artifacts/password-restore-live/report.json`, `password-gate.png`, `restore-ready.png`, `restored-player.png`. 비공개 링크/쿠키/키를 증거 보고서에 기록하지 않았다.
+- 현재 작업자는 복구 대기열을 먼저 처리하고 신규 신청을 처리한다. 여전히 이 클라우드 프로세스가 켜져 있어야 하며 상시 운영 호스팅은 후속 과제다.

@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
 import {PGlite} from '@electric-sql/pglite';
 import {sealResultToken,openResultToken} from '../src/notification-secret.mjs';
+import {issueAccessCookie} from '../src/site-access.mjs';
 import {sealRequestToken,openRequestToken,createRequestSite} from '../src/request-site-runtime.mjs';
 import {hashResultToken} from '../src/identifiers.mjs';
 import {sha256} from '../src/storage-import.mjs';
@@ -13,7 +14,7 @@ test('Site WebCrypto and cloud worker share authenticated encryption without per
  const node=sealResultToken({token,key,songId:id,recipient,origin});assert.equal(await openRequestToken(node,id,key,origin),token);
  await assert.rejects(openRequestToken(node,crypto.randomUUID(),key,origin));
 });
-test('request Site requires a platform-signed visitor, same-origin POST and fixed recipient; duplicate submission reads the same request',async()=>{
+test('request Site requires a password session, same-origin POST and fixed recipient; duplicate submission reads the same request',async()=>{
  let submissions=0;
  const handler=createRequestSite({origin,ownerId:'owner',edgeBase:'https://edge.example.com',assets:{},fetchImpl:async(url,init)=>{
   assert.equal(init.headers['x-request-secret'],'i'.repeat(43));
@@ -21,13 +22,15 @@ test('request Site requires a platform-signed visitor, same-origin POST and fixe
   if(url.includes('/status'))return submissions?Response.json({id,status:'generating'}):new Response(null,{status:404});
   submissions++;const body=JSON.parse(init.body);assert.equal(body.recipient,undefined);assert.equal(body.token,undefined);assert.ok(body.sealedToken);return Response.json({status:'accepted'});
  }});
- const env={REQUEST_INGRESS_KEY:'i'.repeat(43),REQUEST_ENCRYPTION_KEY:key};
- const submit=(extra={})=>new Request(origin+'/api/request/submit',{method:'POST',headers:{Origin:origin,'oai-authenticated-user-id':'owner',...extra},body:JSON.stringify({id,story:'고마운 친구에게',options:{}})});
- assert.equal((await handler.fetch(submit({'oai-authenticated-user-id':''}),env)).status,401);
+ const env={REQUEST_INGRESS_KEY:'i'.repeat(43),REQUEST_ENCRYPTION_KEY:key,SITE_PASSWORD:'fixture-password',SITE_SESSION_KEY:key};
+ const cookie=(await issueAccessCookie({password:env.SITE_PASSWORD,secret:key,origin})).split(';')[0];
+ const submit=(extra={})=>new Request(origin+'/api/request/submit',{method:'POST',headers:{Origin:origin,Cookie:cookie,...extra},body:JSON.stringify({id,story:'고마운 친구에게',options:{}})});
+ assert.equal((await handler.fetch(submit({Cookie:''}),env)).status,401);
  assert.equal((await handler.fetch(submit({Origin:'https://wrong.example.com'}),env)).status,403);
  assert.equal((await handler.fetch(submit(),env)).status,200);assert.equal((await handler.fetch(submit(),env)).status,200);assert.equal(submissions,1);
  const health=extra=>new Request(origin+'/api/request/health',{headers:extra});
- assert.equal((await handler.fetch(health({'oai-authenticated-user-id':'pairwise-site-visitor'}),env)).status,200);
+ assert.equal((await handler.fetch(health({'oai-authenticated-user-id':'pairwise-site-visitor'}),env)).status,401);
+ assert.equal((await handler.fetch(health({Cookie:cookie}),env)).status,200);
  assert.equal((await handler.fetch(health({'x-request-service-key':'wrong'}),env)).status,401);
  assert.equal((await handler.fetch(health({'x-request-service-key':env.REQUEST_INGRESS_KEY}),env)).status,200);
 });
@@ -71,7 +74,7 @@ test('Site uses supported manual redirects and never forwards the request secret
   assert.equal(url,'https://edge.example.com/intake/health');
   return redirect?new Response(null,{status:302,headers:{Location:'https://other.example.com'}}):Response.json({enabled:true,workerReady:true});
  }});
- const request=()=>new Request(origin+'/api/request/health',{headers:{'oai-authenticated-user-id':'site-visitor'}});
+ const request=()=>new Request(origin+'/api/request/health',{headers:{'x-request-service-key':'i'.repeat(43)}});
  const env={REQUEST_INGRESS_KEY:'i'.repeat(43),REQUEST_ENCRYPTION_KEY:key};
  assert.equal((await site.fetch(request(),env)).status,200);
  redirect=true;assert.equal((await site.fetch(request(),env)).status,503);assert.equal(calls,2);

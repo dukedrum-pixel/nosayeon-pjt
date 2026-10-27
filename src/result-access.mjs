@@ -3,7 +3,7 @@ import { SONG_ID,hashResultToken } from './identifiers.mjs';
 import { reissueSong } from './song-reissue.mjs';
 export { SONG_ID,RESULT_TOKEN,hashResultToken } from './identifiers.mjs';
 
-export function createResultHandler({ backend, restoreClient, clock = Date.now }) {
+export function createResultHandler({ backend, restoreClient, requestRestore = reissueSong, clock = Date.now }) {
   const headers = { 'Cache-Control': 'no-store', 'Referrer-Policy': 'no-referrer', 'X-Content-Type-Options': 'nosniff' };
   function json(body, status = 200) {
     return new Response(JSON.stringify(body), { status, headers: { ...headers, 'Content-Type': 'application/json; charset=utf-8' } });
@@ -28,13 +28,15 @@ export function createResultHandler({ backend, restoreClient, clock = Date.now }
       if(url.pathname!=='/api/result'&&(!/^(0|[1-9][0-9]{0,9})$/.test(requested)||Number(requested)!==version))return json({status:'stale'},409);
       if(url.pathname==='/api/restore'){
         if(!canRestore)return json({status:'retention_ended',...common},410);
-        const result=await reissueSong({backend,restoreClient,songId:id,tokenHash:await hashResultToken(token),version});
+        const result=await requestRestore({backend,restoreClient,songId:id,tokenHash:await hashResultToken(token),version});
+        if(result.result==='queued')return json({status:'processing',...common,canRestore:false},202);
         if(result.result==='ready')return json({status:'ready',...result});
         if(['busy','stale'].includes(result.result))return json({status:result.result},409);
         if(result.result==='retention_ended')return json({status:'retention_ended',canRestore:false},410);
         if(result.result==='invalid_link')return json({status:'invalid_link'},401);
         return json({status:'restore_failed',...common},503);
       }
+      if(await backend.hasQueuedRestore?.(id))return json({status:'processing',...common,canRestore:false},409);
       if(link.restore_status==='restoring'&&Date.parse(link.restore_lease_until)>clock())return json({status:'processing',...common,canRestore:false},409);
       if(link.restore_status==='failed'||link.restore_status==='restoring')return json({status:ended?'retention_ended':'restore_failed',...common},409);
       if (link.consumed_at) return json({ status: ended?'retention_ended':'consumed', ...common }, 410);

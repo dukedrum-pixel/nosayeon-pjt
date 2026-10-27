@@ -1,3 +1,4 @@
+import {hasAccessSession,issueAccessCookie,passwordMatches,loginClientHash} from './site-access.mjs';
 const encoder=new TextEncoder();
 const b64=bytes=>btoa(String.fromCharCode(...bytes)).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
 const unb64=value=>Uint8Array.from(atob(value.replace(/-/g,'+').replace(/_/g,'/')),c=>c.charCodeAt(0));
@@ -19,15 +20,21 @@ export function createRequestSite({assets,origin,edgeBase,fetchImpl=fetch}){
  return {async fetch(request,env={},ctx={}){
   const url=new URL(request.url);
   if(url.origin!==origin)return json({error:'forbidden'},403);
-  if(!url.pathname.startsWith('/api/request/')){
+  const service=env.REQUEST_INGRESS_KEY&&request.headers.get('x-request-service-key')===env.REQUEST_INGRESS_KEY;
+  const publicAsset=['/access.css','/js/access-page.mjs'].includes(url.pathname);
+  if(publicAsset&&['GET','HEAD'].includes(request.method)){
+   const asset=assets[url.pathname];return asset?new Response(request.method==='HEAD'?null:asset.body,{headers:{...headers,'Content-Type':asset.mime}}):json({error:'not_found'},404);
+  }
+  const session=await hasAccessSession(request,{password:env.SITE_PASSWORD,secret:env.SITE_SESSION_KEY,origin});
+  const access=session||service;
+  if(!access&&url.pathname!=='/api/session/login'){
+   if(url.pathname.startsWith('/api/')||!['GET','HEAD'].includes(request.method))return json({error:'unauthorized'},401);
+   const page=assets['/access.html'];return page?new Response(request.method==='HEAD'?null:page.body,{headers:{...headers,'Content-Type':page.mime}}):json({error:'not_configured'},503);
+  }
+  if(!url.pathname.startsWith('/api/')){
    const asset=assets[url.pathname];if(!asset||!['GET','HEAD'].includes(request.method))return json({error:'not_found'},404);
    return new Response(request.method==='HEAD'?null:asset.body,{headers:{...headers,'Content-Type':asset.mime}});
   }
-  const visitor=request.headers.get('oai-authenticated-user-id');
-  const service=!visitor&&env.REQUEST_INGRESS_KEY&&request.headers.get('x-request-service-key')===env.REQUEST_INGRESS_KEY;
-  // Dispatch enforces the owner-private Site audience. Its user ID is pairwise, not an account ID.
-  const signedVisitor=typeof visitor==='string'&&visitor.length>0&&visitor.length<=256;
-  if(!signedVisitor&&!service)return json({error:'unauthorized'},401);
   if(request.headers.get('Origin')&&request.headers.get('Origin')!==origin)return json({error:'forbidden'},403);
   if(!env.REQUEST_INGRESS_KEY||!env.REQUEST_ENCRYPTION_KEY){console.warn('request_health_configuration',JSON.stringify({ingressBound:Boolean(env.REQUEST_INGRESS_KEY),encryptionBound:Boolean(env.REQUEST_ENCRYPTION_KEY),envKeys:Object.keys(env),contextKeys:Object.keys(ctx),propertyKeys:Object.keys(ctx.props??{})}));return json({error:'not_configured'},503);}
   async function edge(path,init={}){
@@ -43,6 +50,39 @@ export function createRequestSite({assets,origin,edgeBase,fetchImpl=fetch}){
     const link=new URL('/result.html',origin);link.searchParams.set('id',row.songId);link.hash=new URLSearchParams({token}).toString();state.resultUrl=link.href;
    }
    return state;
+  }
+  if(url.pathname==='/api/session/login'){
+   if(request.method!=='POST')return json({error:'not_found'},404);
+   if(request.headers.get('Origin')!==origin)return json({error:'forbidden'},403);
+   if(!env.SITE_PASSWORD||!env.SITE_SESSION_KEY)return json({error:'not_configured'},503);
+   try{
+    let size=0,chunks=[];for await(const chunk of request.body??[]){size+=chunk.length;if(size>1024)return json({error:'invalid_request'},413);chunks.push(chunk);}
+    const bytes=new Uint8Array(size);let offset=0;for(const chunk of chunks){bytes.set(chunk,offset);offset+=chunk.length;}
+    let body;try{body=JSON.parse(new TextDecoder().decode(bytes));}catch{return json({error:'invalid_request'},400);}
+    const correct=await passwordMatches(body.password,env.SITE_PASSWORD);
+    const response=await edge('/intake/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({clientHash:await loginClientHash(request,env.SITE_SESSION_KEY),success:correct})});
+    if(!response.ok)return json({error:'unavailable'},503);const rate=await response.json();
+    if(rate.blocked)return json({error:'try_later'},429);
+    if(!correct||!rate.allowed)return json({error:'invalid_password'},401);
+    return Response.json({status:'authenticated'},{headers:{...headers,'Set-Cookie':await issueAccessCookie({password:env.SITE_PASSWORD,secret:env.SITE_SESSION_KEY,origin})}});
+   }catch{return json({error:'unavailable'},503);}
+  }
+  if(['/api/result','/api/audio','/api/download','/api/restore'].includes(url.pathname)){
+   const allowedMethod=['/api/download','/api/restore'].includes(url.pathname)?'POST':'GET';
+   if(request.method!==allowedMethod)return json({status:'error'},405);
+   if(request.method==='POST'&&request.headers.get('Origin')!==origin)return json({status:'forbidden'},403);
+   try{
+    const forward={Authorization:request.headers.get('Authorization')??''};
+    if(url.pathname==='/api/restore'){
+     const token=/^Bearer ([A-Za-z0-9_-]{43})$/.exec(forward.Authorization)?.[1],songId=url.searchParams.get('id');
+     if(!token||!uuid(songId))return json({status:'invalid_link'},401);
+     forward['x-restore-sealed-token']=await sealRequestToken(token,songId,env.REQUEST_ENCRYPTION_KEY,origin);
+    }
+    const response=await edge(url.pathname+url.search,{method:request.method,headers:forward});
+    const responseHeaders=new Headers(response.headers);for(const [name,value] of Object.entries(headers))responseHeaders.set(name,value);
+    responseHeaders.delete('Access-Control-Allow-Origin');responseHeaders.delete('Set-Cookie');
+    return new Response(response.body,{status:response.status,headers:responseHeaders});
+   }catch{return json({status:'error'},503);}
   }
   let failurePhase='request';
   try{

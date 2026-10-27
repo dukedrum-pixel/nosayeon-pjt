@@ -64,6 +64,11 @@ export function createStorageBackend({ url, serviceRoleKey, fetchImpl = globalTh
     return `/storage/v1/object/${BUCKET}/${path}`;
   }
   return {
+    loginAttempt: (clientHash,success) => jsonRequest('/rest/v1/rpc/check_site_login_attempt',{method:'POST',json:{p_client_hash:clientHash,p_success:success}}),
+    enqueueRestore: (songId,tokenHash,version,sealedToken) => jsonRequest('/rest/v1/rpc/enqueue_song_restore',{method:'POST',json:{p_song_id:songId,p_token_hash:tokenHash,p_version:version,p_sealed_token:sealedToken}}),
+    hasQueuedRestore: songId => jsonRequest('/rest/v1/rpc/has_queued_song_restore',{method:'POST',json:{p_song_id:songId}}),
+    claimQueuedRestore: () => jsonRequest('/rest/v1/rpc/claim_queued_song_restore',{method:'POST',json:{}}),
+    finishQueuedRestore: (id,claimId,success) => jsonRequest('/rest/v1/rpc/finish_queued_song_restore',{method:'POST',json:{p_id:id,p_claim_id:claimId,p_success:success}}),
     requestReadiness: hash => jsonRequest('/rest/v1/rpc/song_request_readiness',{method:'POST',json:{p_ingress_hash:hash}}),
     submitRequest: (id,prompt,hash,sealed,ingress) => jsonRequest('/rest/v1/rpc/submit_song_request',{method:'POST',json:{p_id:id,p_prompt:prompt,p_token_hash:hash,p_sealed_token:sealed,p_ingress_hash:ingress}}),
     readRequest: (id,hash) => jsonRequest('/rest/v1/rpc/read_song_request',{method:'POST',json:{p_id:id,p_ingress_hash:hash}}),

@@ -1,63 +1,38 @@
 # 다음 작업 인계 — 2026-10-28 한국 시간
 
-## 사용자 합의와 금지 사항
+현재 운영·배포 기준은 [SONG_REQUEST_OPERATIONS.md](SONG_REQUEST_OPERATIONS.md)다. 저장소 `dukedrum-pixel/nosayeon-pjt`, 브랜치 `codex/lyria-recovery-spike`를 이어간다.
 
-사용자는 잠드는 동안 승인 없이 가능한 다음 개발을 순차적으로 계속하고, 확인이 필요한 항목은 뒤로 미루라고 요청했다. SQL 검증·변경은 서비스 시작 전까지 별도 승인 없이 진행하는 기존 합의를 유지한다. 이번 작업은 현재 기능의 개발·검증·배포 준비까지이며 공개 배포·실제 추가 메일·발송 활성화는 실행하지 않았다.
+## 사용자 합의
 
-키·토큰·원문 응답을 출력하거나 Git에 넣지 않는다. 새 음악 생성·자동 재생성·자동 재발송을 하지 않는다. 원래 곡의 다운로드·재신청을 무단 테스트하지 않는다. `doc/PRODUCT_POLICY.md`, `AGENTS.md`를 먼저 읽는다.
+- 기존 MP3 첨부 테스트는 완료·수신 확인됐다. 다시 발송하지 않는다.
+- 신규 사연 신청 → 실제 음악 생성 → dukedrum@gmail.com 결과 링크 안내 → 결과 페이지 재생·다운로드까지 사용자가 승인했고 구현됐다.
+- 최신 요청은 **ChatGPT 로그인 없이 지정한 입장 비밀번호로 접속**, **실제로 동작하는 재신청 버튼**이다. 사용자가 공개 접근과 비밀번호 방식을 명시적으로 선택했고 모두 배포·검증했다. 비밀번호 원문은 문서·소스·Git에 기록하지 않는다.
+- 기존 음악 재신청을 새 음악 생성으로 대체하거나 실패한 생성/메일을 자동 반복하지 않는다. 키·토큰·원문 응답을 출력하거나 Git에 넣지 않는다.
+- 확인이 꼭 필요하면 추천안을 포함한 2~3가지 선택지만 제시한다. 불필요한 승인 질문으로 멈추지 않는다. SQL 변경/검증은 서비스 시작 전까지 별도 승인 없이 진행하도록 합의했다.
 
-## 완료한 작업
+## 현재 배포
 
-저장소 `dukedrum-pixel/nosayeon-pjt`, 브랜치 `codex/lyria-recovery-spike`의 `de151f6`에서 시작했다. UI 구현은 `e2ed17e`에 저장했고 이후 완료 안내·배포 준비 변경을 같은 브랜치에 이어 저장한다.
+- 주소: https://nosayeon-result-check.cw-lee.chatgpt.site
+- 기존 Site ID `appgprj_6ae116663f34819191c39fbf636cea68`를 재사용한다. 새 Site를 생성하지 않는다.
+- Site 소스 `be5e598a70fb4af15ba50c93e46dccf8adaa520f`, 배포 `appgdep_6ae1359b99b4819189e6e66a116b58da`, succeeded, env revision 2.
+- access_mode=public. 이후 수정은 일반 save_site_version/deploy_site_version을 사용한다. 소유자 비공개 배포 도구를 사용하지 않는다.
+- Edge `nosayeon-result-api` v3 ACTIVE. 모든 고객 API는 Site 서버 전용 키를 추가로 요구한다.
+- 마이그레이션 `20261027233531_password_access_and_restore_queue.sql`까지 적용했다. 재적용하지 않는다.
+- 원래 Google/Gmail Secret은 클라우드에 유지한다. Site에는 앱 전용 접수·암호화·세션 키와 입장 비밀번호만 Secret으로 설정했다.
+- Git 제외 `artifacts/request-service/runtime.json`의 기존 key/ingressToken/sessionKey/origin을 보존한다. 임의 교체하면 기존 자료 복호화/접수/세션에 문제가 생긴다. 파일을 출력하지 않는다.
 
-1. Gmail 첨부 테스트는 이미 1회 완료했고 사용자가 수신을 확인했다. `GMAIL_TEST_HANDOFF.md`는 완료 상태로 갱신했다. 옛 테스트 명령을 다시 실행하지 않는다.
-2. 결과 페이지를 아이보리 배경·음반 커버·모바일 대응 화면으로 변경했다. 커스텀 재생/일시정지/탐색/음소거, 다운로드·기한·재신청, 8가지 상태 미리보기를 연결했다. 실제 UI 동작 검증에는 로컬 예시 WAV만 사용했다.
-3. 최초·재신청 완료 메일에 **내 음악 듣기** 버튼과 텍스트 대안을 추가했다. 외부 이미지·추적 픽셀·스크립트 없음. 기본 비활성이다.
-4. 서버 전용 수신처 설정과 AES-256-GCM 암호화 페이지 토큰 보관을 구현했다. 토큰 해시·고정 URL을 교체하지 않는다. 설정·발송·미리보기 CLI와 60초 신규 대기 처리 worker를 연결했다.
-5. DB의 곡·차수별 유일 제약과 발송 점유, sent/failed/unknown/skipped 확정을 구현했다. sending·failed·unknown은 자동 재시도하지 않는다. 이전 차수의 완료가 새 차수 상태를 덮어쓰지 않는다.
-6. 관리자 인증 후 고객 완료 안내 이력을 조회할 수 있다. API에는 수신처·토큰·암호문·완성된 고객 링크를 반환하지 않는다.
-7. 공개 고객 전용 Node 서버와 Dockerfile을 준비했다. 관리자·미리보기·비공개 파일 차단, 고정 HTTPS 원점/Host/Origin 검사, HSTS·CSP 등을 적용했다. 관리자 서버는 기존 loopback 모드로 분리했다.
+## 최신 검증
 
-## 실제 DB 적용과 보존 상태
+전체 테스트 138개 통과. 실제 복구 검증은 이미 다운로드·삭제된 테스트 곡 `72e5698a-188f-472d-a8c2-020091e559cd`에서 1회 진행했다. 원래 주소·토큰 유지, delivery_version=1, stored, consumed=null, 복구 queue succeeded, 새 차수 완료 안내 sent. 실제 음악 재생 후 다운로드 권한 보존을 확인했다. 이번 검증은 음악을 새로 생성하거나 다운로드를 소비하지 않았다.
 
-`result_email_notifications` 마이그레이션을 실제 Supabase에 적용했다. 관리 API가 기록한 버전 `20261027154624`와 로컬 파일명을 맞췄다. 기존 마이그레이션을 재적용하지 않는다.
+브라우저 검증은 배포와 같은 Worker 코드를 로컬 라우팅하고 실제 원격 서비스를 연결했다. 클라우드의 Site 호스트 접속 제한으로 배포 사이트 자체를 브라우저로 검증한 것으로 주장하지 않는다. 네이티브 도구로 실제 배포 succeeded/public을 확인했다. Git 제외 `artifacts/password-restore-live/`에 안전한 보고서와 화면을 보관한다.
 
-롤백 트랜잭션으로 설정·점유·동일 작업 중복 차단·잘못된 operation_id 거부·unknown 후 후보 제외를 확인했다. 새 테이블/RPC에 anon·authenticated 권한이 없고 service_role만 접근한다. Advisors의 ERROR/WARN 없음. RLS 정책 없음 INFO는 서버 전용 설계이고 미사용 인덱스 INFO는 기존 낮은 사용량과 관련된다.
+현재 작업자는 `node --use-env-proxy scripts/song-request-worker.mjs` 프로세스(실행 세션 70779)다. **상시 운영 서버가 아니다.** heartbeat 60초 경과 시 신청을 비활성화한다. 재시작 전 기존 프로세스와 활성 신청·복구를 확인하고, 두 개를 중복 실행하지 않는다. 하루 총 3건·동시 신규 신청 1건 제한을 유지한다. 다음 독립적인 과제는 상시 작업자 호스팅이다. 사용자 요청 없이 실제 생성·복구·메일 테스트를 반복하지 않는다.
 
-최종 확인 시 `song_email_settings=0`, `song_notification_outbox=0`, 이번 검증 fixture=0이다. 실제 완료 안내 수신처를 등록하거나 worker를 활성화하지 않았다. 원래 곡 `c7ed78ea-453a-41ce-84cd-ad185a031f3b`는 stored, delivery_version=0, consumed=false다. 기존 MP3 첨부 sent 기록은 유지한다.
+## 구현 주의
 
-## 검증과 자료
+입장 세션은 8시간 Secure/HttpOnly 쿠키, 비밀번호 5회 실패 시 5분 차단이다. 결과 링크 `#token`은 입장 후에도 유지한다. 결과 UI의 fetch credentials는 same-origin이어야 입장 쿠키가 포함된다. Edge 직접 호출은 고객 토큰만 있어도 401이다.
 
-- `npm test`: 124개 전체 통과. Git 제외 `artifacts/continuation/tests.log`에 결과를 보관한다.
-- Chromium: 결과 화면 8가지 상태, 320/390px 가로 넘침, 재생/일시정지/재개/탐색/음소거, 모의 다운로드 1회 후 음원 해제·재신청 버튼, 잘못된 링크를 확인했다. 브라우저 예외 없음.
-- 메일 미리보기: 데스크톱·320/390px, 버튼 1개와 동일 공개 원점, 외부 자원 없음.
-- Docker: Node 24 이미지 digest 고정, 빌드 성공. non-root·read-only·외부 네트워크 없음·가짜 자격증명으로 헬스/정적 자원/미인증/비공개 경로 차단을 확인했다. 검증 컨테이너는 종료·삭제했다. 이미지를 공개 레지스트리에 올리지 않았다.
-- 이미지: `artifacts/result-design/`, `artifacts/result-email-preview/`. 모두 Git 제외이며 새 환경에 자동 복원되는 자료로 가정하지 않는다.
+복구 버튼은 `/api/restore`를 한 번 접수하고 상태 조회만 반복한다. 클라우드 작업자는 기존 Interaction GET만 수행하고 해시 검증 후 새 다운로드 차수를 준비한다. 자동 새 생성/복구 재시도/메일 재발송을 넣지 않는다. 이미 사용 중이던 구버전 탭은 새로고침해 입장해야 한다.
 
-## 이후에 필요한 확인과 설정
-
-- 공개 결과 서비스의 도메인·호스팅 대상 확정. [배포 준비](RESULT_DEPLOYMENT.md)를 참고한다. 아직 공개 사이트는 없다.
-- 독립적인 `RESULT_LINK_ENCRYPTION_KEY`를 런타임 Secret으로 준비하고 `RESULT_PUBLIC_ORIGIN`을 확정한다. 키를 채팅에 요구하지 않는다. 로컬 암호화에 필요한 실제 바이트를 안전하게 제공해야 하며 proxy placeholder를 키로 쓰지 않는다.
-- 원래 결과 링크의 비공개 보관 파일 확보. **현재 새 작업 공간에 `artifacts/result-links/<곡ID>.json`은 없다.** DB 해시는 원본 토큰으로 복구할 수 없다. 이전 환경의 비공개 파일·보관 자료를 안전하게 연결해야 한다. 이미 발급한 페이지를 임의 재발급·토큰 교체해서 우회하지 않는다.
-- [완료 안내 운영](RESULT_EMAIL_OPERATIONS.md)에 따라 실제 고객 수신처 등록과 발송 활성화를 검토한다. 현재는 `RESULT_EMAIL_ENABLED=false` 기본값이다. 활성화 전 지정 수신처의 페이지 안내 테스트를 계획한다.
-- 원래 음악과 1회 다운로드 권한을 일반 상태 점검이나 스모크 테스트에 사용하지 않는다.
-
-신청 접수·결제/환불, 카카오 비즈메시지, 개인별 관리자 로그인, OAuth 웹 callback, Google Drive 백업은 별도 후속 범위다. 확정되지 않은 계정·서비스·요금제를 임의로 생성하거나 서비스를 시작하지 않는다.
-
-## 무료 임시 주소 후속 진행
-
-사용자가 무료 임시 주소 검증을 선택해 Sites에 비공개 화면 검증 사이트를 생성했다. Site ID·소스·범위는 [TEMP_SITE_HANDOFF.md](TEMP_SITE_HANDOFF.md)에 기록했다. 실제 고객 API·음원 연결은 아직 별도다. 이후 확인 요청은 추천안을 포함한 2~3개 선택지로 제시한다.
-
-## 실제 API 연결 준비와 승인 대기
-
-고객용 Supabase Edge API와 사이트 실연결 페이지 후보를 준비했고 테스트 127개를 통과했다. 자동 승인 검토가 서비스 역할 권한을 쓰는 인터넷 접근 가능 API 배포에 대해 사용자 승인 범위가 불명확하다며 거절했다. 배포하지 않았으며 CLI 등으로 우회하지 않는다. 정확한 배포안·검증·선택지는 [HOSTED_API_APPROVAL.md](HOSTED_API_APPROVAL.md)를 따른다. 기존 비공개 미리보기와 원래 곡 권한은 유지한다.
-
-## 최신: 사용자가 실제 신청 전체 흐름 승인, 구현·실검증 완료
-
-이후 사용자는 사연 신청 버튼 → 실제 신규 음악 생성 → dukedrum@gmail.com 결과 페이지 메일 → 재생/다운로드까지 한 번에 진행하도록 명시적으로 승인했다. 이 요청이 이전 배포 승인 대기를 대체한다. 실제 API는 v2로 배포했고, Site는 신청 페이지와 결과 페이지를 제공하는 Worker로 전환했다. 신규 생성/메일 1회와 실제 재생을 확인했다. [SONG_REQUEST_OPERATIONS.md](SONG_REQUEST_OPERATIONS.md)가 현재 기준이다. 자동 테스트 131개 통과.
-
-현재 클라우드의 `npm run requests:worker` 프로세스가 처리한다. 상시 운영 서버로 독립시킨 상태는 아니다. 기존 앱 전용 Secret 파일을 분실하거나 임의 교체하지 않는다. 신청은 하루 최대 3건·동시 1건이며 worker heartbeat가 오래되면 비활성화된다. 시험 음악의 다운로드 소비 기록이 검증 완료 뒤 발생했으므로, 테스트 곡은 이미 소비/삭제 상태다. 기존 곡 권한은 유지한다. 새 테스트를 자동 반복하지 않는다.
-
-## 최신 수정: 신청 버튼과 현재 진행 단계 표시
-
-사용자 신고로 실제 Site 로그를 확인했다. Workers에서 지원하지 않는 fetch redirect:error 옵션이 health 503의 원인이었고, manual 모드와 명시적 3xx 거부로 수정했다. 5초 상태 재확인·페이지 복귀 시 재확인과 현재 단계 깜빡임/완료 체크를 배포했다. Site 소스 bc886b861553cdf4b9928ca94c96de5b0b1f3a13, 배포 appgdep_6ae12ee860d881919944ee81c4b299e0 succeeded. 실제 health 200 연속 응답과 DB worker_ready=true, 추가 신청 없음(기존 1건)을 확인했다. 테스트 135개 통과.
+과거 계획/검증 기록은 다른 handoff 문서에 남아 있지만 현재 승인 대기나 비공개 전용 상태로 해석하지 않는다. 최신 사용자 지시와 이 문서의 현재 상태를 우선한다.

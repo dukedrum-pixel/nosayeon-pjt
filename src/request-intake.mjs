@@ -10,6 +10,12 @@ export async function handleRequestIntake(request,backend,path){
  const readiness=await backend.requestReadiness(ingressHash);
  if(!readiness)return json({error:'unauthorized'},401);
  if(path==='/intake/health'&&request.method==='GET')return json(readiness);
+ if(path==='/intake/login'&&request.method==='POST'){
+  const text=await request.text();if(text.length>1024)return json({error:'invalid_request'},400);
+  let input;try{input=JSON.parse(text);}catch{return json({error:'invalid_request'},400);}
+  if(!/^[a-f0-9]{64}$/.test(input.clientHash??'')||typeof input.success!=='boolean')return json({error:'invalid_request'},400);
+  return json(await backend.loginAttempt(input.clientHash,input.success));
+ }
  if(path==='/intake/status'&&request.method==='GET'){
   const id=new URL(request.url).searchParams.get('id');if(!SONG_ID.test(id??''))return json({error:'invalid_request'},400);
   const state=await backend.readRequest(id,ingressHash);return state?json(state):json({error:'not_found'},404);

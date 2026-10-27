@@ -2,7 +2,7 @@ import { createResultHandler } from './result-access.mjs';
 import { cleanupConsumedSong } from './result-cleanup.mjs';
 
 const routes = new Set(['/api/result', '/api/audio', '/api/download', '/api/restore']);
-export function createHostedResultApi({ backend, origin, restoreClient, waitUntil = () => {} }) {
+export function createHostedResultApi({ backend, origin, restoreClient, queueRestores = false, waitUntil = () => {} }) {
   const allowed = new URL(origin);
   if (allowed.protocol !== 'https:' || allowed.origin !== origin) throw new Error('invalid_origin');
   const handle = createResultHandler({ backend, restoreClient });
@@ -29,7 +29,8 @@ export function createHostedResultApi({ backend, origin, restoreClient, waitUnti
       } catch { return json({ status: 'unavailable' }, 503); }
     }
     const internal = new URL(`https://result.internal${path}`); internal.search = url.search;
-    const response = await handle(new Request(internal, { method: request.method,
+    const currentHandler=queueRestores?createResultHandler({backend,requestRestore:args=>backend.enqueueRestore(args.songId,args.tokenHash,args.version,request.headers.get('x-restore-sealed-token'))}):handle;
+    const response = await currentHandler(new Request(internal, { method: request.method,
       headers: { Authorization: request.headers.get('Authorization') || '' }, signal: request.signal }));
     if (path === '/api/download' && response.ok) {
       // Audio is already verified and buffered. Cleanup is durable even if the client disconnects.
@@ -37,7 +38,7 @@ export function createHostedResultApi({ backend, origin, restoreClient, waitUnti
     }
     const resultHeaders = new Headers(response.headers);
     for (const [key, value] of Object.entries(headers)) resultHeaders.set(key, value);
-    if (resultHeaders.get('Content-Type')?.includes('application/json') && !restoreClient?.retrieve) {
+    if (resultHeaders.get('Content-Type')?.includes('application/json') && !restoreClient?.retrieve && !queueRestores) {
       const data = await response.json();
       if (Object.hasOwn(data, 'canRestore')) data.canRestore = false;
       return new Response(JSON.stringify(data), { status: response.status, headers: resultHeaders });

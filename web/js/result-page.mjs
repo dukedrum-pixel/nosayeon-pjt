@@ -57,7 +57,7 @@ async function load() {
   if (!/^[0-9a-f-]{36}$/.test(id ?? '') || !/^[A-Za-z0-9_-]{43}$/.test(token ?? '')) { render({ status: 'invalid_link' }); return; }
   try {
     const response = await fetch(api(`/api/result?id=${encodeURIComponent(id)}`), {
-      headers: { Authorization: `Bearer ${token}` }, cache: 'no-store', credentials: 'omit', redirect: 'error', signal: AbortSignal.timeout(20000),
+      headers: { Authorization: `Bearer ${token}` }, cache: 'no-store', credentials: 'same-origin', redirect: 'error', signal: AbortSignal.timeout(20000),
     });
     const data = await response.json();
     if (!response.ok && !['invalid_link', 'expired', 'consumed', 'processing','restore_failed','retention_ended'].includes(data.status)) throw new Error();
@@ -89,7 +89,7 @@ play.addEventListener('click', async () => {
     const file = snapshot.files.find(file => file.index === Number(select.value));
     if (!file) throw new Error();
     const response = await fetch(api(`/api/audio?id=${encodeURIComponent(id)}&file=${file.index}&version=${snapshot.deliveryVersion??0}`), {
-      headers: { Authorization: `Bearer ${token}` }, cache: 'no-store', credentials: 'omit', redirect: 'error', signal: controller.signal,
+      headers: { Authorization: `Bearer ${token}` }, cache: 'no-store', credentials: 'same-origin', redirect: 'error', signal: controller.signal,
     });
     if (!response.ok) { const state=await response.json();if(state.status==='stale')await load();else render(state);return; }
     if (response.headers.get('Content-Type') !== file.mime || Number(response.headers.get('Content-Length')) !== file.bytes) throw new Error();
@@ -115,7 +115,7 @@ download.addEventListener('click', async () => {
   try {
     const files = snapshot.files;
     const response = await fetch(api(`/api/download?id=${encodeURIComponent(id)}&version=${snapshot.deliveryVersion??0}`), {
-      method: 'POST', headers: { Authorization: `Bearer ${token}` }, cache: 'no-store', credentials: 'omit', redirect: 'error', signal: controller.signal,
+      method: 'POST', headers: { Authorization: `Bearer ${token}` }, cache: 'no-store', credentials: 'same-origin', redirect: 'error', signal: controller.signal,
     });
     if (!response.ok) throw new Error();
     const mime = files.length > 1 ? 'application/zip' : files[0].mime;
@@ -151,7 +151,7 @@ restore.addEventListener('click',async()=>{
   audioPending?.abort();clearAudio();restoreMessage.textContent='기존 다운로드를 종료하고 같은 음악을 다시 준비하고 있습니다.';
   render({status:'processing'});
   try{
-    await fetch(api(`/api/restore?id=${encodeURIComponent(id)}&version=${version}`),{method:'POST',headers:{Authorization:`Bearer ${token}`},credentials:'omit',cache:'no-store',redirect:'error',signal:AbortSignal.timeout(600000)});
+    await fetch(api(`/api/restore?id=${encodeURIComponent(id)}&version=${version}`),{method:'POST',headers:{Authorization:`Bearer ${token}`},credentials:'same-origin',cache:'no-store',redirect:'error',signal:AbortSignal.timeout(600000)});
   }catch{}
   finally{
     restoring=false;await load();
