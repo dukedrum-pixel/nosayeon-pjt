@@ -1,4 +1,5 @@
 import { buildResultView } from './result-state.mjs';
+import { setupResultPlayer, updateResultStatus } from './result-player.mjs';
 
 const player = document.querySelector('#result-audio');
 const play = document.querySelector('#result-play');
@@ -7,6 +8,7 @@ const download = document.querySelector('#result-download');
 const downloadMessage = document.querySelector('#download-message');
 const restore=document.querySelector('#result-restore');
 const restoreMessage=document.querySelector('#restore-message');
+const playerUI = setupResultPlayer(player, play);
 const sourceUrl = new URL(location.href);
 const id = sourceUrl.searchParams.get('id');
 let token = new URLSearchParams(sourceUrl.hash.slice(1)).get('token');
@@ -20,6 +22,7 @@ function clearAudio() {
   player.pause(); player.removeAttribute('src'); player.load();
   if (blobUrl) URL.revokeObjectURL(blobUrl);
   blobUrl = null;
+  playerUI.reset();
 }
 
 function render(value) {
@@ -27,6 +30,7 @@ function render(value) {
   clearTimeout(pollTimer);
   snapshot = value;
   const view = buildResultView(value);
+  updateResultStatus(view.status);
   document.querySelector('#result-heading').textContent = view.heading;
   document.querySelector('#result-message').textContent = view.message;
   document.querySelector('#result-playback').hidden = !view.showPlayer;
@@ -38,7 +42,7 @@ function render(value) {
   deadline.textContent=value?.restoreDeadline?`재신청 가능 기한: ${new Date(value.restoreDeadline).toLocaleString('ko-KR',{timeZone:'Asia/Seoul'})} (한국 시간)`:'';
   const expiry = document.querySelector('#result-expiry');
   expiry.hidden = !view.expiresAt;
-  expiry.textContent = view.expiresAt ? `사용 가능 기한: ${new Date(view.expiresAt).toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' })} (한국 시간)` : '';
+  expiry.textContent = view.expiresAt ? `다운로드 가능: ${new Date(view.expiresAt).toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' })}까지 (한국 시간) · 1회` : '';
   if (!view.showPlayer) { audioPending?.abort(); downloadPending?.abort(); clearAudio(); }
   const dates=[view.expiresAt,view.showRestore?value?.restoreDeadline:null].filter(Boolean).map(Date.parse).filter(time=>time>Date.now());
   if(dates.length)expiryTimer=setTimeout(()=>{clearAudio();load();},Math.min(Math.min(...dates)-Date.now(),2147483647));
@@ -57,6 +61,7 @@ async function load() {
     const view = buildResultView(data);
     if (view.status === 'available') {
       if (!Array.isArray(data.files) || data.files.length < 1 || data.files.length > 8) throw new Error();
+      document.querySelector('#result-file-picker').hidden = data.files.length === 1;
       select.replaceChildren();
       for (const [index, file] of data.files.entries()) {
         if (file.index !== index + 1 || !['audio/mpeg', 'audio/mp3', 'audio/wav'].includes(file.mime)
@@ -72,7 +77,9 @@ async function load() {
 play.addEventListener('click', async () => {
   if (downloading||restoring) return;
   if (buildResultView(snapshot).status !== 'available') { render({ status: 'expired' }); return; }
+  if (blobUrl && !player.error) { await playerUI.toggle(); return; }
   play.disabled = true; select.disabled = true; clearAudio();
+  playerUI.setStatus('음악을 불러오고 있어요…');
   const controller = new AbortController(); audioPending = controller;
   const timeout = setTimeout(() => controller.abort(), 60000);
   try {
@@ -88,9 +95,10 @@ play.addEventListener('click', async () => {
     if (controller.signal.aborted || downloading) return;
     if (buildResultView(snapshot).status !== 'available') { if (snapshot?.status === 'available') render({ status: 'expired' }); return; }
     blobUrl = URL.createObjectURL(blob); player.src = blobUrl;
-    document.querySelector('#result-message').textContent = '노래를 불러왔습니다. 재생 버튼을 눌러 들어보세요.';
+    playerUI.setStatus('노래가 준비됐어요.');
+    await playerUI.toggle();
   } catch {
-    if (!controller.signal.aborted && !downloading && buildResultView(snapshot).status === 'available') render({ status: 'error' });
+    if (!downloading && !restoring && audioPending === controller && buildResultView(snapshot).status === 'available') playerUI.setStatus('음악을 불러오지 못했어요. 재생 버튼으로 다시 시도해 주세요.');
   } finally { clearTimeout(timeout); if (audioPending === controller) audioPending = null; play.disabled = downloading||restoring; select.disabled = downloading||restoring; }
 });
 
@@ -145,7 +153,7 @@ restore.addEventListener('click',async()=>{
   finally{
     restoring=false;await load();
     restoreMessage.textContent=snapshot?.status==='available'&&(snapshot.deliveryVersion??0)>version
-      ?'같은 음악이 다시 준비되었습니다. 이 페이지 주소는 그대로입니다. 이메일·카톡 알림은 아직 연결되지 않았습니다.'
+      ?'같은 음악이 다시 준비되었습니다. 이 페이지에서 다시 듣고 저장할 수 있어요.'
       :snapshot?.status==='processing'?'음악을 준비하고 있습니다. 새로고침해도 이 페이지에서 상태를 확인할 수 있습니다.':'재신청을 완료하지 못했습니다. 현재 상태를 확인한 뒤 직접 다시 신청해 주세요.';
   }
 });

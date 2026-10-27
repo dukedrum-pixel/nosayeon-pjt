@@ -94,6 +94,11 @@ test('로컬 서버는 웹 파일만 제공하고 다른 호스트·출처와 �
   try {
     const base = `http://127.0.0.1:${server.address().port}`;
     assert.equal((await fetch(`${base}/result.html`)).status, 200);
+    for (const [path, mime] of [['result.css', 'text/css'], ['js/result-player.mjs', 'text/javascript']]) {
+      const asset = await fetch(`${base}/${path}`);
+      assert.equal(asset.status, 200);
+      assert.equal(asset.headers.get('Content-Type'), `${mime}; charset=utf-8`);
+    }
     assert.equal((await fetch(`${base}/api/result?id=${id}`)).status, 401);
     const authorized = await fetch(`${base}/api/result?id=${id}`, { headers: { Authorization: `Bearer ${token}` } });
     assert.equal(authorized.status, 200);

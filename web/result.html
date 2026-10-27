@@ -7,31 +7,40 @@
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; connect-src 'self'; media-src blob:; object-src 'none'; base-uri 'none'; form-action 'none'">
   <title>노사연 · 당신의 노래</title>
   <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="result.css">
   <script type="module" src="js/result-page.mjs"></script>
 </head>
-<body>
-  <header class="topbar"><a class="brand" href="./">노사연<span>사연을 노래로</span></a><span class="badge">내부 연결 검증</span></header>
-  <main class="result-layout">
-    <section class="intro"><p class="eyebrow">YOUR STORY, YOUR SONG</p><h1>사연이 담긴<br>당신의 노래.</h1><p>소중한 마음을 오래 간직할 수 있도록.</p></section>
-    <section class="card result-card" aria-labelledby="result-heading">
-      <div role="status" aria-live="polite" aria-atomic="true"><h2 id="result-heading">결과 링크를 확인해 주세요</h2><p id="result-message">유효한 결과 링크로 다시 접속해 주세요.</p></div>
-      <p id="result-expiry" class="hint" hidden></p>
-      <div id="result-playback" hidden>
-        <label for="result-file">재생할 음원</label><select id="result-file"></select>
-        <button id="result-play" class="secondary" type="button">노래 불러오기</button>
-        <audio id="result-audio" controls preload="none" controlslist="nodownload" aria-describedby="playback-hint"></audio>
-        <p id="playback-hint" class="hint">음악 재생만으로 다운로드 횟수를 사용하지 않습니다.</p>
+<body class="song-page">
+  <header class="song-topbar"><a class="brand" href="./">노사연<span>사연을 노래로</span></a><span class="topbar-note">당신만을 위한 한 곡</span></header>
+  <main class="song-layout">
+    <section class="song-intro"><p class="song-eyebrow">A SONG TO KEEP</p><h1>마음이 머무는 곳,<br>당신의 노래.</h1><p>한 편의 사연이, 오래 간직할 음악이 되었어요.</p></section>
+    <section class="song-card" aria-labelledby="result-heading" data-status="loading">
+      <div class="cover-art" role="img" aria-label="노을빛 배경 위에 놓인 음반 일러스트">
+        <span class="cover-kicker">STORIES INTO MELODIES</span><span class="cover-orbit" aria-hidden="true"></span><span class="record" aria-hidden="true"><span class="record-label">노사연<br><small>YOUR STORY</small></span></span>
+        <span class="cover-caption">오직 당신의 이야기로.</span><span class="cover-edition">THE PERSONAL COLLECTION · 01</span>
       </div>
-      <button id="result-download" class="primary" type="button" disabled hidden>노래 다운로드 · 1회</button>
-      <p id="download-message" class="hint" role="status" aria-live="polite"></p>
-      <button id="result-restore" class="secondary" type="button" disabled hidden>다운로드 다시 신청</button>
-      <p id="restore-message" class="hint" role="status" aria-live="polite"></p>
-      <p id="restore-deadline" class="hint" hidden></p>
-      <p class="hint">다운로드 요청이 시작되면 링크를 사용한 것으로 처리합니다. 도중에 취소하거나 연결이 끊겨도 사용 완료가 될 수 있습니다. 여러 음원은 ZIP 파일 하나로 받습니다.</p>
-      <p class="hint">최초 생성 후 50일 이내에는 횟수 제한 없이 다시 신청할 수 있습니다. 재신청하면 기존 다운로드 권한과 파일을 지우고 같은 음악을 다시 준비합니다. 이 페이지 주소는 그대로 유지됩니다.</p>
+      <div class="song-content">
+        <div class="song-status" id="result-status">확인 중</div>
+        <div role="status" aria-live="polite" aria-atomic="true"><h2 id="result-heading">노래를 확인하고 있어요</h2><p id="result-message">잠시만 기다려 주세요.</p></div>
+        <div id="result-playback" hidden>
+          <div id="result-file-picker" hidden><label for="result-file">재생할 음원</label><select id="result-file"></select></div>
+          <div class="player-controls">
+            <button id="result-play" class="play-button" type="button" aria-label="노래 재생"><span id="play-icon" aria-hidden="true">▶</span></button>
+            <div class="player-track"><span class="track-name">당신의 사연이 담긴 노래</span><span id="player-status" class="track-detail" role="status">재생 버튼을 눌러 들어보세요</span></div>
+            <button id="result-mute" class="mute-button" type="button" aria-label="음소거" aria-pressed="false">소리 켬</button>
+          </div>
+          <label class="sr-only" for="result-seek">재생 위치</label><input id="result-seek" class="seek-bar" type="range" min="0" max="100" value="0" step="0.1" disabled aria-valuetext="0:00">
+          <div class="player-times"><span id="result-current">0:00</span><span id="result-duration">0:00</span></div>
+          <audio id="result-audio" preload="none" controlslist="nodownload" aria-label="당신의 노래" hidden></audio>
+          <p id="playback-hint" class="listening-note">몇 번을 들어도 다운로드 횟수는 줄지 않아요.</p>
+        </div>
+        <div class="download-area"><button id="result-download" class="song-download" type="button" disabled hidden><span>내 노래 다운로드</span><span aria-hidden="true">↓</span></button><p id="result-expiry" class="expiry-note" hidden></p><p id="download-message" class="action-message" role="status" aria-live="polite"></p></div>
+        <div class="restore-area"><button id="result-restore" class="song-restore" type="button" disabled hidden>다운로드 다시 신청 <span aria-hidden="true">↗</span></button><p id="restore-message" class="action-message" role="status" aria-live="polite"></p><p id="restore-deadline" class="expiry-note" hidden></p></div>
+      </div>
     </section>
-    <noscript><p class="notice">결과를 확인하려면 JavaScript를 활성화해 주세요.</p></noscript>
+    <section class="song-guide" aria-labelledby="guide-heading"><div><p class="song-eyebrow">KEEP YOUR MOMENT</p><h2 id="guide-heading">소중한 노래, 이렇게 간직하세요.</h2></div><div class="guide-items"><div><span class="guide-number">01</span><h3>여유롭게 들어보세요</h3><p>다운로드 전까지, 사용 가능 기간 안에서 편하게 감상하세요.</p></div><div><span class="guide-number">02</span><h3>내 기기에 저장하세요</h3><p>저장 완료부터 최대 7일, 차수마다 한 번 다운로드할 수 있어요. 여러 음원은 ZIP 하나로 전달돼요.</p></div><div><span class="guide-number">03</span><h3>다시 필요할 때도 여기에서</h3><p>최초 생성 후 50일 이내에는 횟수 제한 없이 같은 음악을 다시 신청할 수 있어요.</p></div></div><details><summary>다운로드·재신청 전 확인해 주세요</summary><p>다운로드 전송이 시작되면 사용 완료로 처리되고 서버의 음원이 삭제됩니다. 취소하거나 연결이 끊겨도 사용 완료될 수 있으니 안정적인 연결에서 저장해 주세요.</p><p>재신청하면 기존 다운로드 권한과 저장 파일을 종료하고 같은 음악을 다시 준비합니다. 새 음악을 생성하지 않으며, 이 페이지 주소는 그대로 유지됩니다.</p></details></section>
+    <noscript><p class="notice">음악을 듣고 다운로드하려면 JavaScript를 활성화해 주세요.</p></noscript>
   </main>
-  <footer>노사연 · 소중한 사연을, 오래 남을 노래로.</footer>
+  <footer class="song-footer"><span class="brand">노사연</span><p>소중한 사연을, 오래 남을 노래로.</p><span>MADE FROM YOUR STORY</span></footer>
 </body>
 </html>

@@ -11,7 +11,8 @@ const staticFiles = new Map([
   ['/admin.css', ['admin.css', 'text/css']],
   ['/js/admin.mjs', ['js/admin.mjs', 'text/javascript']],
   ['/styles.css', ['styles.css', 'text/css']],
-  ...['app', 'prompt-builder', 'result-state', 'result-preview', 'result-page'].map(name =>
+  ['/result.css', ['result.css', 'text/css']],
+  ...['app', 'prompt-builder', 'result-state', 'result-preview', 'result-page', 'result-player'].map(name =>
     [`/js/${name}.mjs`, [`js/${name}.mjs`, 'text/javascript']]),
 ]);
 
