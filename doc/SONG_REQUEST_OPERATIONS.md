@@ -5,9 +5,9 @@
 - 신청 주소: https://nosayeon-result-check.cw-lee.chatgpt.site
 - 이름: 노사연 · 사연을 노래로
 - Site ID: `appgprj_6ae116663f34819191c39fbf636cea68`
-- Site 소스: `eb04eaa28e1a408e6e07b42e8cef817eac61c295`
-- 배포: `appgdep_6ae16f9b6c1c819190627988faf5ef45`, succeeded, 환경 revision 2
-- 버전: `appgprj_6ae116663f34819191c39fbf636cea68~appgver_a1d2d3f6cb3481918849896d5a30c300`
+- Site 소스: `31ce9f70bb7230f95e4043f3abdaa587c7c57ff1`
+- 배포: `appgdep_6ae171d581388191a0d30bb838416747`, succeeded, 환경 revision 2
+- 버전: `appgprj_6ae116663f34819191c39fbf636cea68~appgver_b036ce777ef081919ec3017e7bba52cd`
 - Supabase Edge Function: `nosayeon-result-api`, version 4, ACTIVE
 - 마이그레이션: `20261027224532 / song_request_pipeline`
 
@@ -33,7 +33,7 @@ Site의 `REQUEST_INGRESS_KEY`, `REQUEST_ENCRYPTION_KEY`는 새로 만든 앱 전
 npm run requests:worker
 ```
 
-작업자는 시작할 때 Gmail 토큰 갱신·발신 계정 일치를 확인하고 10초마다 heartbeat를 기록한다. heartbeat가 60초 넘게 끊기면 신규 신청 버튼이 비활성화된다. 하루 최대 3건, 동시 활성 신청 1건이다. 이는 공용 입장 비밀번호를 아는 테스트 이용자 전체에 적용되는 제한이다.
+작업자는 시작할 때 Gmail 토큰 갱신·발신 계정 일치를 확인하고 10초마다 heartbeat를 기록한다. heartbeat가 60초 넘게 끊기면 신규 신청 버튼이 비활성화된다. 최근 24시간 최대 50건, 동시 활성 신청 1건이다. 이는 공용 입장 비밀번호를 아는 테스트 이용자 전체에 적용되는 제한이다.
 
 **상시 운영 서버는 아직 아니다.** 현재 클라우드 환경과 작업자 프로세스가 살아 있을 때 처리한다. 환경 중지·프로세스 종료 뒤에도 DB 접수·상태는 보존하지만 자동 재기동/24시간 가용성을 보장하지 않는다. 장기 운영에는 Google/Gmail 인증이 준비된 상시 작업자 호스팅을 마련해야 한다.
 
@@ -107,3 +107,11 @@ docker inspect --format '{{.State.Status}} restart={{.HostConfig.RestartPolicy.N
 신청 토큰 암호화는 신청별 수신처에 바인딩하고, 서버 내부 상태에서 읽은 같은 수신처로 복호화한다. 기존 신청도 기존 주소로 계속 복호화된다. 재신청은 `song_email_settings`의 저장된 수신처를 조회해 완료 안내를 구성한다. 복구 전달 봉투의 legacy AAD 문자열은 호환성을 위해 유지하며 **메일 목적지와 별개**다. 이 문자열을 실제 메일 수신처로 사용하지 않는다.
 
 검증: 다른 예시 이메일에 대한 신청→암호화→메일 전달 테스트, 재신청 시 저장된 이메일로 설정하는 테스트, SQL/권한·입력 검증 포함 전체 139개 통과. 실제 DB에서 invalid_recipient, anon 실행 불가, service_role 실행 가능을 확인했다. 네이티브 배포 succeeded, 실제 Edge workerReady=true, 기존 신청의 결과 링크 복호화 성공을 확인했다. 실제 추가 음악·메일은 만들지 않았다. Security advisors ERROR/WARN 없음(서버 전용 RLS 무정책 INFO만 존재).
+
+## 신청 한도 50회와 새로고침 재입장 — 2026-10-28
+
+최신 사용자 지시로 최근 24시간 전체 신청 한도를 3회에서 50회로 늘렸다. 기존 신청 기록과 횟수는 삭제/초기화하지 않았다. 기존/신규 접수 RPC 모두 `20261028035241_request_limit_50.sql`로 같은 한도를 적용했다. 동시 활성 신청 1건 제한은 유지한다. 기존의 3회 제한 기록은 과거 상태다.
+
+신청 주소 `/`의 GET/HEAD는 유효한 쿠키가 있어도 비밀번호 화면을 반환한다. 비밀번호는 기존 Secret 값을 유지한다. 성공한 로그인에 한해서 서버가 정적 신청 HTML을 응답하고, 브라우저가 현재 URL/fragment를 유지해 그 화면을 설치한다. 외부 script/eval이나 URL의 로그인 토큰을 사용하지 않는다. 새로고침하면 서버에서 다시 입장 화면을 받으므로 반복 입력이 필요하다. 결과 페이지/API의 8시간 HttpOnly 쿠키는 계속 사용하며, 음악 결과 페이지에 별도 매번 재입장 정책을 확대하지 않았다.
+
+검증: 전체 139개 통과. 유효 쿠키로 `/`를 새로 요청해도 입장 화면인지, 올바른 비밀번호만 신청 HTML을 받는지, 49건 상태에서 50번째 허용·동일 신청 중복 미집계·51번째 차단을 검사했다. 실제 DB는 한도 50 적용/최근 24시간 3건/worker_ready=true로 확인했다. 네이티브 배포 succeeded. 실제 추가 생성·메일·신청은 만들지 않았다. 페이지 자체의 브라우저 수동 검증은 수행하지 않았고, 서버 계약·자동 테스트·배포 상태를 검증했다.

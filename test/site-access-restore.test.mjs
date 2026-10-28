@@ -19,16 +19,21 @@ test('password session is signed, expiring, HTTP-only and invalidated by passwor
 });
 test('anonymous visitors see the password gate; page/API protection cannot be bypassed with identity headers',async()=>{
  let calls=0;
- const app=createRequestSite({assets:{'/access.html':{body:'password gate',mime:'text/html'},'/result.html':{body:'private player',mime:'text/html'}},origin,edgeBase:'https://edge.example.com',fetchImpl:async(url,init)=>{
+ const app=createRequestSite({assets:{'/':{body:'request form',mime:'text/html'},'/access.html':{body:'password gate',mime:'text/html'},'/result.html':{body:'private player',mime:'text/html'}},origin,edgeBase:'https://edge.example.com',fetchImpl:async(url,init)=>{
   calls++;assert.equal(init.redirect,'manual');if(url.endsWith('/intake/login')){const body=JSON.parse(init.body);assert.equal(body.password,undefined);return Response.json({allowed:body.success,blocked:false});}return Response.json({enabled:true,workerReady:true});
  }});
  const env={SITE_PASSWORD:password,SITE_SESSION_KEY:key,REQUEST_INGRESS_KEY:'i'.repeat(43),REQUEST_ENCRYPTION_KEY:key};
  const page=await app.fetch(new Request(origin+'/result.html?id=example'),env);assert.equal(await page.text(),'password gate');
  assert.equal((await app.fetch(new Request(origin+'/api/request/health',{headers:{'oai-authenticated-user-id':'forged'}}),env)).status,401);assert.equal(calls,0);
- const login=value=>new Request(origin+'/api/session/login',{method:'POST',headers:{Origin:origin,'Content-Type':'application/json'},body:JSON.stringify({password:value})});
+ const login=(value,page)=>new Request(origin+'/api/session/login',{method:'POST',headers:{Origin:origin,'Content-Type':'application/json'},body:JSON.stringify({password:value,page})});
  assert.equal((await app.fetch(login('wrong'),env)).status,401);
  const good=await app.fetch(login(password),env);assert.equal(good.status,200);const cookie=good.headers.get('Set-Cookie').split(';')[0];
  assert.equal(await (await app.fetch(new Request(origin+'/result.html?id=example',{headers:{Cookie:cookie}}),env)).text(),'private player');
+ // Refreshing the request URL always returns the gate, even with a valid session cookie.
+ assert.equal(await (await app.fetch(new Request(origin+'/',{headers:{Cookie:cookie}}),env)).text(),'password gate');
+ const entry=await app.fetch(login(password,'request'),env);assert.equal((await entry.json()).requestPage,'request form');
+ assert.equal((await app.fetch(login('wrong','request'),env)).status,401);
+
 });
 test('password attempts and queued restore run with service-only SQL; same audio returns with a new download version',async()=>{
  const db=new PGlite(),objects=new Map();

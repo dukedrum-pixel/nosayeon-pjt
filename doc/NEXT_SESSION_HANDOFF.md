@@ -14,10 +14,10 @@
 
 - 주소: https://nosayeon-result-check.cw-lee.chatgpt.site
 - 기존 Site ID `appgprj_6ae116663f34819191c39fbf636cea68`를 재사용한다. 새 Site를 생성하지 않는다.
-- Site 소스 `eb04eaa28e1a408e6e07b42e8cef817eac61c295`, 배포 `appgdep_6ae16f9b6c1c819190627988faf5ef45`, succeeded, env revision 2.
+- Site 소스 `31ce9f70bb7230f95e4043f3abdaa587c7c57ff1`, 배포 `appgdep_6ae171d581388191a0d30bb838416747`, succeeded, env revision 2.
 - access_mode=public. 이후 수정은 일반 save_site_version/deploy_site_version을 사용한다. 소유자 비공개 배포 도구를 사용하지 않는다.
 - Edge `nosayeon-result-api` v4 ACTIVE. 모든 고객 API는 Site 서버 전용 키를 추가로 요구한다.
-- 마이그레이션 `20261028034241_request_recipient_email.sql`까지 적용했다. 재적용하지 않는다.
+- 마이그레이션 `20261028035241_request_limit_50.sql`까지 적용했다. 재적용하지 않는다.
 - 원래 Google/Gmail Secret은 클라우드에 유지한다. Site에는 앱 전용 접수·암호화·세션 키와 입장 비밀번호만 Secret으로 설정했다.
 - Git 제외 `artifacts/request-service/runtime.json`의 기존 key/ingressToken/sessionKey/origin을 보존한다. 임의 교체하면 기존 자료 복호화/접수/세션에 문제가 생긴다. 파일을 출력하지 않는다.
 
@@ -29,7 +29,7 @@
 
 현재 작업자는 detached Docker 컨테이너 `nosayeon-request-worker`다. 이전 대화 실행 세션 작업자는 종료됐고 heartbeat가 끊긴 원인이었다. `Dockerfile.request-worker`와 `scripts/start-request-worker-container.mjs`로 기존 인증/프록시/CA를 유지하면서 `unless-stopped`로 실행한다. 별도 실행에서도 running 및 실제 workerReady=true를 확인했다. 기존 컨테이너와 활성 작업을 확인하기 전에 같은 작업자를 추가하지 않는다. 로그/inspect 전체로 환경 값을 출력하지 말고 안전한 format만 사용한다.
 
-환경 자체 중지/프록시 세션 변경까지 보장하는 상시 운영 호스팅은 아니다. 하루 총 3건·동시 신규 신청 1건 제한을 유지한다. 사용자 요청 없이 실제 생성·복구·메일 테스트를 반복하지 않는다. 인증이 없는 구버전 탭/세션 만료는 신청 화면에서 사연을 유지한 채 비밀번호 재입력을 안내한다. 구버전 JS를 실행 중인 탭은 한 번 새로고침해야 한다.
+환경 자체 중지/프록시 세션 변경까지 보장하는 상시 운영 호스팅은 아니다. 최근 24시간 총 50건·동시 신규 신청 1건 제한을 유지한다. 사용자 요청 없이 실제 생성·복구·메일 테스트를 반복하지 않는다. 인증이 없는 구버전 탭/세션 만료는 신청 화면에서 사연을 유지한 채 비밀번호 재입력을 안내한다. 구버전 JS를 실행 중인 탭은 한 번 새로고침해야 한다.
 
 ## 구현 주의
 
@@ -44,3 +44,9 @@
 신청 이메일은 초기 공란·직접 입력·필수다. 새 신청은 사용자가 입력한 주소로 보낸다. Site → Edge v4 → submit_song_request_to_email → 작업자/완료 안내에 같은 recipient를 전달하고 암호화에도 바인딩한다. 기존 신청의 주소/토큰은 유지한다. 재신청 완료 메일은 song_email_settings의 기존 수신처를 사용한다. 복구 봉투의 legacy AAD는 메일 목적지가 아니므로 목적지로 재사용하지 않는다. 하루 3건 제한은 바꾸지 않았다.
 
 전체 139개 통과, 새 배포 succeeded, 새 작업자 이미지로 컨테이너를 안전하게 교체했다. 이번 검증에서 실제 음악·메일은 추가하지 않았다. 입력칸만 바꾸고 서버를 고정 수신처로 남기는 변경은 금지한다. SQL은 사용자가 별도 질문 없이 진행하도록 재확인했다.
+
+## 최신: 한도 50회 / 신청 페이지 새로고침 재입장
+
+사용자 요청으로 최근 24시간 신청 한도를 50회로 변경했다. 기존 3건은 보존하며 50건을 추가 지급하는 정책이 아니다. 기존/신규 RPC 모두 적용, 동시 1건은 유지한다. 최신 마이그레이션은 request_limit_50이다. 2026-10-28 03:53 UTC DB 확인 시 사용 3건/worker_ready=true였다.
+
+신청 `/`는 매 GET/HEAD마다 비밀번호 화면을 반환한다. 로그인 성공 응답의 정적 requestPage HTML을 DOMParser로 설치하고 module script를 활성화하며, URL/fragment를 바꾸지 않는다. 성공 후 location.reload를 사용하면 입장 루프가 생기므로 다시 넣지 않는다. 결과 페이지의 쿠키 재사용은 유지한다. 실제 비밀번호 원문은 소스/문서에 기록하지 않는다. 전체 139개 통과, 배포 succeeded. 추가 실제 신청/음악/메일 테스트는 하지 않았다.

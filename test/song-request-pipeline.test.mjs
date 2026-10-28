@@ -54,6 +54,7 @@ test('request SQL is service-only, claim-once, idempotent and keeps offline/dupl
   await db.exec('create role anon;create role authenticated;create role service_role bypassrls;create table public.songs(id uuid primary key);');
   await db.exec(await readFile(new URL('../supabase/migrations/20261027224532_song_request_pipeline.sql',import.meta.url),'utf8'));
   await db.exec(await readFile(new URL('../supabase/migrations/20261028034241_request_recipient_email.sql',import.meta.url),'utf8'));
+  await db.exec(await readFile(new URL('../supabase/migrations/20261028035241_request_limit_50.sql',import.meta.url),'utf8'));
   const rpc=async(n,args=[])=> (await db.query(`select public.${n}(${args.map((_,i)=>'$'+(i+1)).join(',')}) v`,args)).rows[0].v;
   const ingress='b'.repeat(64),sealed=sealResultToken({token,key,songId:id,recipient,origin}),hash=await hashResultToken(token),args=[id,'prompt',hash,sealed,ingress,recipient];
   await db.query('insert into public.song_request_runtime(id,ingress_hash,enabled) values(true,$1,true)',[ingress]);
@@ -65,6 +66,15 @@ test('request SQL is service-only, claim-once, idempotent and keeps offline/dupl
   assert.equal(await rpc('progress_song_request',[id,'unknown',null,null]),true);assert.equal(await rpc('claim_song_request'),null);
   assert.equal((await rpc('read_song_request',[id,ingress])).status,'unknown');assert.equal((await rpc('read_song_request',[id,ingress])).recipient,recipient);
   assert.equal((await rpc('submit_song_request_to_email',[...args.slice(0,5),'bad\r\nBcc: other@example.com'])).result,'invalid_recipient');
+  // 49 accepted requests in the rolling window permit exactly one more.
+  await db.query(`insert into public.song_requests(id,prompt,token_hash,sealed_token,recipient,status)
+   select gen_random_uuid(),'completed fixture',md5(i::text)||md5('hash'||i),$1,$2,'completed' from generate_series(1,48) i`,[sealed,recipient]);
+  const fiftieth=[crypto.randomUUID(),'50th',await hashResultToken('z'.repeat(43)),sealed,ingress,recipient];
+  assert.equal((await rpc('submit_song_request_to_email',fiftieth)).result,'accepted');
+  assert.equal((await rpc('submit_song_request_to_email',fiftieth)).result,'existing');
+  assert.equal((await rpc('claim_song_request')).id,fiftieth[0]);await rpc('progress_song_request',[fiftieth[0],'completed',null,null]);
+  const fiftyFirst=[crypto.randomUUID(),'51st',await hashResultToken('y'.repeat(43)),sealed,ingress,recipient];
+  assert.equal((await rpc('submit_song_request_to_email',fiftyFirst)).result,'daily_limit');
   for(const role of ['anon','authenticated']){assert.equal((await db.query("select has_table_privilege($1,'public.song_requests','SELECT') allowed",[role])).rows[0].allowed,false);}
  }finally{await db.close();}
 });

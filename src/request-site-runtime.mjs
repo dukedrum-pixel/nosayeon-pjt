@@ -28,7 +28,9 @@ export function createRequestSite({assets,origin,edgeBase,fetchImpl=fetch}){
   }
   const session=await hasAccessSession(request,{password:env.SITE_PASSWORD,secret:env.SITE_SESSION_KEY,origin});
   const access=session||service;
-  if(!access&&url.pathname!=='/api/session/login'){
+  // The request form requires a fresh password on every top-level page load.
+  const requestEntry=url.pathname==='/'&&['GET','HEAD'].includes(request.method)&&!service;
+  if((!access||requestEntry)&&url.pathname!=='/api/session/login'){
    if(url.pathname.startsWith('/api/')||!['GET','HEAD'].includes(request.method))return json({error:'unauthorized'},401);
    const page=assets['/access.html'];return page?new Response(request.method==='HEAD'?null:page.body,{headers:{...headers,'Content-Type':page.mime}}):json({error:'not_configured'},503);
   }
@@ -65,7 +67,7 @@ export function createRequestSite({assets,origin,edgeBase,fetchImpl=fetch}){
     if(!response.ok)return json({error:'unavailable'},503);const rate=await response.json();
     if(rate.blocked)return json({error:'try_later'},429);
     if(!correct||!rate.allowed)return json({error:'invalid_password'},401);
-    return Response.json({status:'authenticated'},{headers:{...headers,'Set-Cookie':await issueAccessCookie({password:env.SITE_PASSWORD,secret:env.SITE_SESSION_KEY,origin})}});
+    return Response.json({status:'authenticated',...(body.page==='request'?{requestPage:assets['/']?.body}: {})},{headers:{...headers,'Set-Cookie':await issueAccessCookie({password:env.SITE_PASSWORD,secret:env.SITE_SESSION_KEY,origin})}});
    }catch{return json({error:'unavailable'},503);}
   }
   if(['/api/result','/api/audio','/api/download','/api/restore'].includes(url.pathname)){
