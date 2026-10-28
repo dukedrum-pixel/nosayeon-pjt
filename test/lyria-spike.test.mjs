@@ -156,3 +156,10 @@ test('조회 대기 상한을 넘으면 생성 재요청 없이 종료', async (
   assert.equal(creates, 1);
   assert.equal(gets, 2);
 });
+
+test('multi-megabyte valid audio avoids regexp stack overflow and malformed padding stays rejected',async()=>{
+ const bytes=Buffer.alloc(4163356,37),data=bytes.toString('base64');
+ const files=await extractAudio(interaction([{type:'audio',mime_type:'audio/mpeg',data}]),{});
+ assert.deepEqual(files[0].bytes,bytes);
+ for(const invalid of ['A===','AAA','AA=A','====',data+'!'])await assert.rejects(extractAudio(interaction([{type:'audio',mime_type:'audio/mpeg',data:invalid}]),{}),/Base64/);
+});

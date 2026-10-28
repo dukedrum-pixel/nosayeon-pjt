@@ -5,30 +5,30 @@ import { openResultToken, sealResultToken } from './notification-secret.mjs';
 import { deliverResultNotifications } from './result-notifications.mjs';
 
 export async function processSongRequest({job,backend,client,mailer,key,origin,wait=ms=>new Promise(resolve=>setTimeout(resolve,ms)),maxPolls=120}){
- let interaction=null,attempted=false,stage='generating',songId=null;
+ let interaction=null,attempted=false,stage='generating',songId=null,phase='token_validation';
  try{
   const token=openResultToken({sealedToken:job.sealed_token,key,songId:job.id,recipient:job.recipient,origin});
   if(await hashResultToken(token)!==job.token_hash)throw new Error('token_mismatch');
-  attempted=true;
+  attempted=true;phase='provider_creation';
   let response=await client.create(job.prompt); // Exactly one creation POST per durable claim.
   if(typeof response.id!=='string'||!response.id)throw new Error('missing_interaction');
   interaction=response.id;
   if(!await backend.progressRequest(job.id,'generating',interaction))throw new Error('checkpoint_failed');
   for(let i=0;response.status==='in_progress';i++){
    if(i>=maxPolls)throw new Error('poll_timeout');
-   await wait(5000);response=await client.get(interaction);
+   phase='provider_poll';await wait(5000);response=await client.get(interaction);
    if(response.id!==interaction)throw new Error('interaction_mismatch');
   }
   if(response.status!=='completed')throw new Error('generation_failed');
-  const audio=await extractAudio(response,client);
-  stage='saving';if(!await backend.progressRequest(job.id,stage,interaction))throw new Error('checkpoint_failed');
+  phase='audio_validation';const audio=await extractAudio(response,client);
+  stage='saving';phase='storage_import';if(!await backend.progressRequest(job.id,stage,interaction))throw new Error('checkpoint_failed');
   const generatedAt=typeof response.created==='string'&&Number.isFinite(Date.parse(response.created))?response.created:job.generation_reserved_at;
   const stored=await importGeneratedAudio({backend,manifest:{interactionId:interaction,model:'lyria-3.5',generatedAt,files:audio.map((file,i)=>({...file,index:i+1}))}});
   if(!['stored','already_stored'].includes(stored.result))throw new Error('storage_failed');
   songId=stored.songId;
-  const link=await backend.issueResultLink(songId,job.token_hash);
+  phase='result_link';const link=await backend.issueResultLink(songId,job.token_hash);
   if(link?.song_id!==songId)throw new Error('link_failed');
-  stage='notifying';if(!await backend.progressRequest(job.id,stage,interaction,songId))throw new Error('checkpoint_failed');
+  stage='notifying';phase='notification';if(!await backend.progressRequest(job.id,stage,interaction,songId))throw new Error('checkpoint_failed');
   const configured=await backend.configureSongEmail({songId,tokenHash:job.token_hash,recipient:job.recipient,sender:mailer.sender,origin,
    sealedToken:sealResultToken({token,key,songId,recipient:job.recipient,origin})});
   if(configured?.result!=='configured')throw new Error('notification_configuration_failed');
@@ -43,6 +43,6 @@ export async function processSongRequest({job,backend,client,mailer,key,origin,w
   const state=stage==='notifying'?'mail_unknown':attempted&&!interaction?'unknown':'failed';
   try{await backend.progressRequest(job.id,state,interaction,songId);}catch{}
   const http=/HTTP (\d{3})/.exec(error?.message??'');
-  return {requestId:job.id,status:state,songId,stage,errorCode:['http_error','network_error','content_mismatch','invalid_response','local_error'].includes(error?.code)?error.code:'processing_failed',providerHttpStatus:http?Number(http[1]):null};
+  return {requestId:job.id,status:state,songId,stage,phase,errorType:['Error','RangeError','TypeError','SpikeError','StorageError'].includes(error?.name)?error.name:'Error',errorCode:['http_error','network_error','content_mismatch','invalid_response','local_error'].includes(error?.code)?error.code:'processing_failed',providerHttpStatus:http?Number(http[1]):null};
  }
 }

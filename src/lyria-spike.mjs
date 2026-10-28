@@ -94,7 +94,10 @@ export async function extractAudio(interaction, client) {
     }
     let bytes;
     if (typeof block.data === 'string' && block.data.length) {
-      if (block.data.length > Math.ceil(MAX_BYTES / 3) * 4 || !/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(block.data)) {
+      const padding=block.data.endsWith('==')?2:block.data.endsWith('=')?1:0;
+      // A repeated four-character group over multi-MB audio can overflow V8's regexp stack.
+      if (block.data.length > Math.ceil(MAX_BYTES / 3) * 4 || block.data.length%4!==0
+        || /[^A-Za-z0-9+/]/.test(block.data.slice(0,block.data.length-padding))) {
         throw new SpikeError('오디오 Base64 형식 또는 크기가 올바르지 않아.');
       }
       bytes = Buffer.from(block.data, 'base64');
