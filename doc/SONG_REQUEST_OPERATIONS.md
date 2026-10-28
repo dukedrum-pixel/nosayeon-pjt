@@ -5,9 +5,9 @@
 - 신청 주소: https://nosayeon-result-check.cw-lee.chatgpt.site
 - 이름: 노사연 · 사연을 노래로
 - Site ID: `appgprj_6ae116663f34819191c39fbf636cea68`
-- Site 소스: `31ce9f70bb7230f95e4043f3abdaa587c7c57ff1`
-- 배포: `appgdep_6ae171d581388191a0d30bb838416747`, succeeded, 환경 revision 2
-- 버전: `appgprj_6ae116663f34819191c39fbf636cea68~appgver_b036ce777ef081919ec3017e7bba52cd`
+- Site 소스: `f1617afb638c39c5dea22fba29228f82cdbd2aa6`
+- 배포: `appgdep_6ae1c093e850819193998f6093320ce9`, succeeded, 환경 revision 2
+- 버전: `appgprj_6ae116663f34819191c39fbf636cea68~appgver_1b354f62b0b0819198916108cbfd48ac`
 - Supabase Edge Function: `nosayeon-result-api`, version 4, ACTIVE
 - 마이그레이션: `20261027224532 / song_request_pipeline`
 
@@ -115,3 +115,11 @@ docker inspect --format '{{.State.Status}} restart={{.HostConfig.RestartPolicy.N
 신청 주소 `/`의 GET/HEAD는 유효한 쿠키가 있어도 비밀번호 화면을 반환한다. 비밀번호는 기존 Secret 값을 유지한다. 성공한 로그인에 한해서 서버가 정적 신청 HTML을 응답하고, 브라우저가 현재 URL/fragment를 유지해 그 화면을 설치한다. 외부 script/eval이나 URL의 로그인 토큰을 사용하지 않는다. 새로고침하면 서버에서 다시 입장 화면을 받으므로 반복 입력이 필요하다. 결과 페이지/API의 8시간 HttpOnly 쿠키는 계속 사용하며, 음악 결과 페이지에 별도 매번 재입장 정책을 확대하지 않았다.
 
 검증: 전체 139개 통과. 유효 쿠키로 `/`를 새로 요청해도 입장 화면인지, 올바른 비밀번호만 신청 HTML을 받는지, 49건 상태에서 50번째 허용·동일 신청 중복 미집계·51번째 차단을 검사했다. 실제 DB는 한도 50 적용/최근 24시간 3건/worker_ready=true로 확인했다. 네이티브 배포 succeeded. 실제 추가 생성·메일·신청은 만들지 않았다. 페이지 자체의 브라우저 수동 검증은 수행하지 않았고, 서버 계약·자동 테스트·배포 상태를 검증했다.
+
+## 最新 수정: 재신청 후 안내 문구와 버튼 — 2026-10-28
+
+사용자 화면에서 재신청 완료 후에도 이전 다운로드의 사용 완료/재신청 준비 중 문구가 남았다. 결과 페이지의 render가 최신 상태와 다운로드 차수에 맞춰 안내 문구도 갱신하도록 수정했다. 재신청 접수 즉시 이전 다운로드 안내를 지우고, 자동 조회로 새 차수가 사용 가능해지면 완료 안내로 바꾼다. 다음 다운로드를 시작하면 이전 재신청 완료 안내도 지운다. 다운로드 중 재신청 버튼은 즉시 비활성화한다.
+
+재신청 버튼은 은은한 베이지 배경, 명확한 테두리와 짙은 글자, 48px 최소 높이를 적용했다. 주 다운로드 버튼보다 차분하게 유지하면서 hover/active/focus/disabled 상태를 구분한다.
+
+`test/result-page-actions.test.mjs`는 가짜 음원/API로 다운로드→사용 완료→재신청 POST 1회→처리 중→자동 조회 준비 완료를 재현하고 오래된 문구 제거·새 완료 안내·다운로드 버튼 활성화를 확인한다. 전체 테스트 140개 통과, 배포 succeeded. SQL/Edge/작업자는 바꾸지 않았고 실제 고객 음원 다운로드·복구·음악 생성·메일 발송은 하지 않았다. 업데이트를 보려면 기존 결과 페이지를 새로고침한다.

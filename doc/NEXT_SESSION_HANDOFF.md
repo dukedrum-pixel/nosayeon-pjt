@@ -14,7 +14,7 @@
 
 - 주소: https://nosayeon-result-check.cw-lee.chatgpt.site
 - 기존 Site ID `appgprj_6ae116663f34819191c39fbf636cea68`를 재사용한다. 새 Site를 생성하지 않는다.
-- Site 소스 `31ce9f70bb7230f95e4043f3abdaa587c7c57ff1`, 배포 `appgdep_6ae171d581388191a0d30bb838416747`, succeeded, env revision 2.
+- Site 소스 `f1617afb638c39c5dea22fba29228f82cdbd2aa6`, 배포 `appgdep_6ae1c093e850819193998f6093320ce9`, succeeded, env revision 2.
 - access_mode=public. 이후 수정은 일반 save_site_version/deploy_site_version을 사용한다. 소유자 비공개 배포 도구를 사용하지 않는다.
 - Edge `nosayeon-result-api` v4 ACTIVE. 모든 고객 API는 Site 서버 전용 키를 추가로 요구한다.
 - 마이그레이션 `20261028035241_request_limit_50.sql`까지 적용했다. 재적용하지 않는다.
@@ -50,3 +50,11 @@
 사용자 요청으로 최근 24시간 신청 한도를 50회로 변경했다. 기존 3건은 보존하며 50건을 추가 지급하는 정책이 아니다. 기존/신규 RPC 모두 적용, 동시 1건은 유지한다. 최신 마이그레이션은 request_limit_50이다. 2026-10-28 03:53 UTC DB 확인 시 사용 3건/worker_ready=true였다.
 
 신청 `/`는 매 GET/HEAD마다 비밀번호 화면을 반환한다. 로그인 성공 응답의 정적 requestPage HTML을 DOMParser로 설치하고 module script를 활성화하며, URL/fragment를 바꾸지 않는다. 성공 후 location.reload를 사용하면 입장 루프가 생기므로 다시 넣지 않는다. 결과 페이지의 쿠키 재사용은 유지한다. 실제 비밀번호 원문은 소스/문서에 기록하지 않는다. 전체 139개 통과, 배포 succeeded. 추가 실제 신청/음악/메일 테스트는 하지 않았다.
+
+## 最新 수정: 재신청 후 안내 문구와 버튼 — 2026-10-28
+
+사용자 화면에서 재신청 완료 후에도 이전 다운로드의 사용 완료/재신청 준비 중 문구가 남았다. 결과 페이지의 render가 최신 상태와 다운로드 차수에 맞춰 안내 문구도 갱신하도록 수정했다. 재신청 접수 즉시 이전 다운로드 안내를 지우고, 자동 조회로 새 차수가 사용 가능해지면 완료 안내로 바꾼다. 다음 다운로드를 시작하면 이전 재신청 완료 안내도 지운다. 다운로드 중 재신청 버튼은 즉시 비활성화한다.
+
+재신청 버튼은 은은한 베이지 배경, 명확한 테두리와 짙은 글자, 48px 최소 높이를 적용했다. 주 다운로드 버튼보다 차분하게 유지하면서 hover/active/focus/disabled 상태를 구분한다.
+
+`test/result-page-actions.test.mjs`는 가짜 음원/API로 다운로드→사용 완료→재신청 POST 1회→처리 중→자동 조회 준비 완료를 재현하고 오래된 문구 제거·새 완료 안내·다운로드 버튼 활성화를 확인한다. 전체 테스트 140개 통과, 배포 succeeded. SQL/Edge/작업자는 바꾸지 않았고 실제 고객 음원 다운로드·복구·음악 생성·메일 발송은 하지 않았다. 업데이트를 보려면 기존 결과 페이지를 새로고침한다.

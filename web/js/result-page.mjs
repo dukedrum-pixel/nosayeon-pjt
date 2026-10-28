@@ -19,7 +19,7 @@ let token = new URLSearchParams(sourceUrl.hash.slice(1)).get('token');
 // Fragments are not sent in HTTP requests or Referer; never log this URL.
 let snapshot = null, blobUrl = null, expiryTimer = null, audioPending = null, downloadPending = null;
 let downloading = false;
-let restoring=false,pollTimer=null;
+let restoring=false,pollTimer=null,restoreFromVersion=null;
 
 function clearAudio() {
   player.pause(); player.removeAttribute('src'); player.load();
@@ -33,6 +33,20 @@ function render(value) {
   clearTimeout(pollTimer);
   snapshot = value;
   const view = buildResultView(value);
+  // Action copy follows the latest delivery state, including background polling.
+  if(view.status==='available'){
+    downloadMessage.textContent='';
+    const restored=restoreFromVersion!==null&&(value.deliveryVersion??0)>restoreFromVersion;
+    restoreMessage.textContent=restored?'같은 음악이 다시 준비되었습니다. 다시 듣거나 다운로드할 수 있어요.':'';
+    if(restored)restoreFromVersion=null;
+  }else if(view.status==='processing'){
+    downloadMessage.textContent='';
+    if(restoreFromVersion===null&&Number.isInteger(value.deliveryVersion))restoreFromVersion=value.deliveryVersion;
+    restoreMessage.textContent='같은 음악을 다시 준비하고 있습니다. 준비가 끝나면 자동으로 표시됩니다.';
+  }else{
+    restoreMessage.textContent=restoreFromVersion!==null&&['consumed','expired','restore_failed','error'].includes(view.status)
+      ?'재신청을 완료하지 못했습니다. 현재 상태를 확인한 뒤 직접 다시 신청해 주세요.':'';
+  }
   updateResultStatus(view.status);
   document.querySelector('#result-heading').textContent = view.heading;
   document.querySelector('#result-message').textContent = view.message;
@@ -107,7 +121,8 @@ play.addEventListener('click', async () => {
 
 download.addEventListener('click', async () => {
   if (downloading||restoring || buildResultView(snapshot).status !== 'available') return;
-  downloading = true; download.disabled = true; play.disabled = true; select.disabled = true;
+  restoreFromVersion=null;restoreMessage.textContent='';
+  downloading = true; download.disabled = true; restore.disabled = true; play.disabled = true; select.disabled = true;
   audioPending?.abort(); clearAudio();
   const controller = new AbortController(); downloadPending = controller;
   const timeout = setTimeout(() => controller.abort(), 600000);
@@ -147,17 +162,15 @@ download.addEventListener('click', async () => {
 
 restore.addEventListener('click',async()=>{
   if(restoring||downloading||!buildResultView(snapshot).showRestore)return;
-  const version=snapshot.deliveryVersion??0;restoring=true;
-  audioPending?.abort();clearAudio();restoreMessage.textContent='기존 다운로드를 종료하고 같은 음악을 다시 준비하고 있습니다.';
-  render({status:'processing'});
+  const version=snapshot.deliveryVersion??0;restoreFromVersion=version;restoring=true;
+  audioPending?.abort();clearAudio();downloadMessage.textContent='';
+  render({status:'processing',deliveryVersion:version});
   try{
     await fetch(api(`/api/restore?id=${encodeURIComponent(id)}&version=${version}`),{method:'POST',headers:{Authorization:`Bearer ${token}`},credentials:'same-origin',cache:'no-store',redirect:'error',signal:AbortSignal.timeout(600000)});
   }catch{}
   finally{
     restoring=false;await load();
-    restoreMessage.textContent=snapshot?.status==='available'&&(snapshot.deliveryVersion??0)>version
-      ?'같은 음악이 다시 준비되었습니다. 이 페이지에서 다시 듣고 저장할 수 있어요.'
-      :snapshot?.status==='processing'?'음악을 준비하고 있습니다. 새로고침해도 이 페이지에서 상태를 확인할 수 있습니다.':'재신청을 완료하지 못했습니다. 현재 상태를 확인한 뒤 직접 다시 신청해 주세요.';
+
   }
 });
 
