@@ -5,7 +5,7 @@ import {PGlite} from '@electric-sql/pglite';
 import {hasAccessSession,issueAccessCookie,passwordMatches} from '../src/site-access.mjs';
 import {createRequestSite} from '../src/request-site-runtime.mjs';
 import {hashResultToken} from '../src/identifiers.mjs';
-import {sealResultToken} from '../src/notification-secret.mjs';
+import {sealResultToken,openResultToken} from '../src/notification-secret.mjs';
 import {sha256} from '../src/storage-import.mjs';
 import {processQueuedRestore} from '../src/queued-song-restore.mjs';
 const origin='https://nosayeon-result-check.cw-lee.chatgpt.site',key=Buffer.alloc(32,11).toString('base64url'),password='fixture-password';
@@ -50,11 +50,12 @@ test('password attempts and queued restore run with service-only SQL; same audio
   assert.equal((await rpc('enqueue_song_restore',[id,tokenHash,0,sealed])).result,'busy');
   assert.equal(await rpc('has_queued_song_restore',[id]),true);assert.equal(await rpc('claim_versioned_download',[id,tokenHash,0]),null);
   const job=await rpc('claim_queued_song_restore');assert.equal(await rpc('claim_queued_song_restore'),null);objects.set(original,bytes);
-  const backend={beginRestore:(...a)=>rpc('begin_song_restore',a),restoreLease:(...a)=>rpc('check_song_restore',a),finishRestore:(...a)=>rpc('finish_song_restore',a),failRestore:(...a)=>rpc('fail_song_restore',a),
-   remove:async paths=>{for(const p of paths)objects.delete(p);},objectExists:async p=>objects.has(p),download:async p=>objects.get(p)??null,upload:async(p,data)=>objects.set(p,data),finishQueuedRestore:(...a)=>rpc('finish_queued_song_restore',a),requestNotification:async()=>({status:'pending_setup'})};
+  let savedEmail;const recipient='restore-listener@example.com';
+  const backend={restoreRecipient:async()=>recipient,configureSongEmail:async config=>{savedEmail=config;return {result:'configured'};},beginRestore:(...a)=>rpc('begin_song_restore',a),restoreLease:(...a)=>rpc('check_song_restore',a),finishRestore:(...a)=>rpc('finish_song_restore',a),failRestore:(...a)=>rpc('fail_song_restore',a),
+   remove:async paths=>{for(const p of paths)objects.delete(p);},objectExists:async p=>objects.has(p),download:async p=>objects.get(p)??null,upload:async(p,data)=>objects.set(p,data),finishQueuedRestore:(...a)=>rpc('finish_queued_song_restore',a),requestNotification:async()=>({id:crypto.randomUUID(),status:'sent'})};
   let retrievals=0;
-  const result=await processQueuedRestore({job,backend,key,origin,restoreClient:{retrieve:async baseline=>{retrievals++;assert.equal(baseline.interactionId,id);assert.equal(objects.has(original),false);return [{bytes}];}}});
-  assert.equal(result.status,'ready');assert.equal(retrievals,1);assert.equal(await rpc('has_queued_song_restore',[id]),false);
+  const result=await processQueuedRestore({job,backend,key,origin,mailer:{sender:'peter@humansyntax.kr',sendResultLink:async()=>{throw new Error('already sent');}},restoreClient:{retrieve:async baseline=>{retrievals++;assert.equal(baseline.interactionId,id);assert.equal(objects.has(original),false);return [{bytes}];}}});
+  assert.equal(result.status,'ready');assert.equal(savedEmail.recipient,recipient);assert.equal(openResultToken({sealedToken:savedEmail.sealedToken,key,songId:id,recipient,origin}),token);assert.equal(retrievals,1);assert.equal(await rpc('has_queued_song_restore',[id]),false);
   const link=(await db.query('select delivery_version,consumed_at,token_hash from public.song_result_links where song_id=$1',[id])).rows[0];assert.deepEqual(link,{delivery_version:1,consumed_at:null,token_hash:tokenHash});
   const file=(await db.query('select storage_path,sha256 from public.song_files where song_id=$1',[id])).rows[0];assert.equal(file.sha256,digest);assert.deepEqual(objects.get(file.storage_path),bytes);
   assert.equal((await rpc('enqueue_song_restore',[id,tokenHash,0,sealed])).result,'stale');

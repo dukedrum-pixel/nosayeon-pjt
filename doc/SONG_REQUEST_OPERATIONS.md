@@ -5,17 +5,17 @@
 - 신청 주소: https://nosayeon-result-check.cw-lee.chatgpt.site
 - 이름: 노사연 · 사연을 노래로
 - Site ID: `appgprj_6ae116663f34819191c39fbf636cea68`
-- Site 소스: `4312077bddec06719a732c08cff258b03e4600c6`
-- 배포: `appgdep_6ae13808c2908191b9dc981bf8561baf`, succeeded, 환경 revision 2
-- 버전: `appgprj_6ae116663f34819191c39fbf636cea68~appgver_add9ed5fb42481919968779086ff0c57`
-- Supabase Edge Function: `nosayeon-result-api`, version 3, ACTIVE
+- Site 소스: `eb04eaa28e1a408e6e07b42e8cef817eac61c295`
+- 배포: `appgdep_6ae16f9b6c1c819190627988faf5ef45`, succeeded, 환경 revision 2
+- 버전: `appgprj_6ae116663f34819191c39fbf636cea68~appgver_a1d2d3f6cb3481918849896d5a30c300`
+- Supabase Edge Function: `nosayeon-result-api`, version 4, ACTIVE
 - 마이그레이션: `20261027224532 / song_request_pipeline`
 
 사용자는 신규 사연을 입력하고 신청하면 실제 음악이 생성되고 dukedrum@gmail.com으로 결과 페이지 링크가 전송되며 음악 재생·다운로드가 되는 수준까지 진행하라고 명시적으로 승인했다. 기존 복구를 신규 생성으로 대체하는 금지는 유지한다. 이번 신규 생성은 기존 곡 복구와 별개다.
 
 ## 흐름
 
-1. ChatGPT 로그인 없이 Site에서 입장 비밀번호를 입력한 뒤 사연·옵션을 입력하고 노래 신청하기를 누른다. 수신처는 dukedrum@gmail.com으로 고정된다.
+1. ChatGPT 로그인 없이 Site에서 입장 비밀번호를 입력한 뒤 사연·옵션을 입력하고 노래 신청하기를 누른다. 수신 이메일은 빈칸에서 시작하며 사용자가 입력한 주소를 해당 신청의 수신처로 저장한다.
 2. Site 서버가 제출 내용을 검증하고, 새 페이지 토큰을 생성해 AES-256-GCM으로 암호화한다. 브라우저에 원본 토큰이나 서버 키를 요구하지 않는다.
 3. 서버 전용 접수 키로 Edge API에 접수한다. Edge API는 서버에서 프롬프트를 구성하고 RLS가 적용된 서비스 전용 DB에 접수한다. 새 접수 키는 Google/Gmail 인증값과 별개이고, DB에는 접수 키 해시만 있다.
 4. 클라우드 작업자는 DB에서 한 번만 점유한 신청에 Google 생성 POST를 정확히 한 번 수행한다. Interaction ID를 받은 뒤 먼저 체크포인트를 기록한다. 이후에는 동일 Interaction GET만 가능하며 결과 불명 시 자동 새 생성하지 않는다.
@@ -97,3 +97,13 @@ docker inspect --format '{{.State.Status}} restart={{.HostConfig.RestartPolicy.N
 기존 컨테이너/작업자가 있으면 런처는 새 작업자를 만들지 않는다. 코드 업데이트 시 활성 작업·큐를 확인하고 안전하게 기존 컨테이너를 중지·교체한다. 환경 자체가 중지되거나 프록시/Secret 세션이 바뀌면 가용성을 보장하지 않는다. 독립적인 상시 호스팅은 아직 후속 과제다.
 
 검증: 전체 139개 통과. 별도 실행 호출에서도 컨테이너가 running으로 유지되고, 배포와 동일한 Site Worker의 실제 Edge health가 HTTP 200/enabled=true/workerReady=true였다. 이번 수정에서 새 음악·복구·메일 요청은 만들지 않았다. 배포 succeeded. 기존에 열어둔 구버전 탭은 한 번 새로고침한다.
+
+## 수신 이메일 직접 입력 — 2026-10-28
+
+사용자 요청으로 신청 페이지의 고정 수신처를 제거했다. 이메일 입력칸은 초기값 없이 비어 있으며 필수 입력·최대 254자·이메일 자동완성을 제공한다. 앞뒤 공백을 제거하고 Site/Edge/DB에서 단일 이메일 주소인지 검사한다. 빈칸·주소 목록·개행/메일 헤더 주입을 거부한다. 접수 이후 수신처도 사연/옵션과 함께 잠근다.
+
+마이그레이션 `20261028034241_request_recipient_email.sql` 적용: 신청별 이메일 제약, 서비스 전용 `submit_song_request_to_email` RPC, 내부 상태 조회의 recipient 필드를 추가했다. 기존 수신처 행과 기존 5인수 RPC/런타임의 legacy 기본값은 보존하지만 새 UI/Edge는 새 RPC에 입력한 수신처를 명시한다. RLS와 하루 3건·동시 1건 제한은 유지한다.
+
+신청 토큰 암호화는 신청별 수신처에 바인딩하고, 서버 내부 상태에서 읽은 같은 수신처로 복호화한다. 기존 신청도 기존 주소로 계속 복호화된다. 재신청은 `song_email_settings`의 저장된 수신처를 조회해 완료 안내를 구성한다. 복구 전달 봉투의 legacy AAD 문자열은 호환성을 위해 유지하며 **메일 목적지와 별개**다. 이 문자열을 실제 메일 수신처로 사용하지 않는다.
+
+검증: 다른 예시 이메일에 대한 신청→암호화→메일 전달 테스트, 재신청 시 저장된 이메일로 설정하는 테스트, SQL/권한·입력 검증 포함 전체 139개 통과. 실제 DB에서 invalid_recipient, anon 실행 불가, service_role 실행 가능을 확인했다. 네이티브 배포 succeeded, 실제 Edge workerReady=true, 기존 신청의 결과 링크 복호화 성공을 확인했다. 실제 추가 음악·메일은 만들지 않았다. Security advisors ERROR/WARN 없음(서버 전용 RLS 무정책 INFO만 존재).

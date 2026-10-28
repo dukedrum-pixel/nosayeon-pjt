@@ -3,9 +3,8 @@ import { googleJson, validAccessToken, verifyGoogleSender } from './gmail-auth.m
 import { buildResultNotificationMail } from './result-notification-mail.mjs';
 
 // Deliberately accepts one plain address, never a list or a display-name header.
-export const validEmail = value => typeof value === 'string' && value.length <= 254
-  && /^[A-Za-z0-9.!#$%&'*+/=?^_`{|}~-]+@[A-Za-z0-9](?:[A-Za-z0-9.-]*[A-Za-z0-9])?\.[A-Za-z]{2,63}$/.test(value)
-  && !value.includes('..');
+import {validEmail} from './email-address.mjs';
+export {validEmail} from './email-address.mjs';
 export const EMAIL_AUDIO_LIMIT = 18 * 1024 * 1024;
 
 export class GmailDeliveryError extends Error {

@@ -14,10 +14,10 @@
 
 - 주소: https://nosayeon-result-check.cw-lee.chatgpt.site
 - 기존 Site ID `appgprj_6ae116663f34819191c39fbf636cea68`를 재사용한다. 새 Site를 생성하지 않는다.
-- Site 소스 `4312077bddec06719a732c08cff258b03e4600c6`, 배포 `appgdep_6ae13808c2908191b9dc981bf8561baf`, succeeded, env revision 2.
+- Site 소스 `eb04eaa28e1a408e6e07b42e8cef817eac61c295`, 배포 `appgdep_6ae16f9b6c1c819190627988faf5ef45`, succeeded, env revision 2.
 - access_mode=public. 이후 수정은 일반 save_site_version/deploy_site_version을 사용한다. 소유자 비공개 배포 도구를 사용하지 않는다.
-- Edge `nosayeon-result-api` v3 ACTIVE. 모든 고객 API는 Site 서버 전용 키를 추가로 요구한다.
-- 마이그레이션 `20261027233531_password_access_and_restore_queue.sql`까지 적용했다. 재적용하지 않는다.
+- Edge `nosayeon-result-api` v4 ACTIVE. 모든 고객 API는 Site 서버 전용 키를 추가로 요구한다.
+- 마이그레이션 `20261028034241_request_recipient_email.sql`까지 적용했다. 재적용하지 않는다.
 - 원래 Google/Gmail Secret은 클라우드에 유지한다. Site에는 앱 전용 접수·암호화·세션 키와 입장 비밀번호만 Secret으로 설정했다.
 - Git 제외 `artifacts/request-service/runtime.json`의 기존 key/ingressToken/sessionKey/origin을 보존한다. 임의 교체하면 기존 자료 복호화/접수/세션에 문제가 생긴다. 파일을 출력하지 않는다.
 
@@ -38,3 +38,9 @@
 복구 버튼은 `/api/restore`를 한 번 접수하고 상태 조회만 반복한다. 클라우드 작업자는 기존 Interaction GET만 수행하고 해시 검증 후 새 다운로드 차수를 준비한다. 자동 새 생성/복구 재시도/메일 재발송을 넣지 않는다. 이미 사용 중이던 구버전 탭은 새로고침해 입장해야 한다.
 
 과거 계획/검증 기록은 다른 handoff 문서에 남아 있지만 현재 승인 대기나 비공개 전용 상태로 해석하지 않는다. 최신 사용자 지시와 이 문서의 현재 상태를 우선한다.
+
+## 최신 사용자 변경: 수신 이메일 직접 입력
+
+신청 이메일은 초기 공란·직접 입력·필수다. 새 신청은 사용자가 입력한 주소로 보낸다. Site → Edge v4 → submit_song_request_to_email → 작업자/완료 안내에 같은 recipient를 전달하고 암호화에도 바인딩한다. 기존 신청의 주소/토큰은 유지한다. 재신청 완료 메일은 song_email_settings의 기존 수신처를 사용한다. 복구 봉투의 legacy AAD는 메일 목적지가 아니므로 목적지로 재사용하지 않는다. 하루 3건 제한은 바꾸지 않았다.
+
+전체 139개 통과, 새 배포 succeeded, 새 작업자 이미지로 컨테이너를 안전하게 교체했다. 이번 검증에서 실제 음악·메일은 추가하지 않았다. 입력칸만 바꾸고 서버를 고정 수신처로 남기는 변경은 금지한다. SQL은 사용자가 별도 질문 없이 진행하도록 재확인했다.

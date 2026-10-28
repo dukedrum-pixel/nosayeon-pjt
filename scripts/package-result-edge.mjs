@@ -1,6 +1,6 @@
 import { readFile } from 'node:fs/promises';
 export async function resultEdgeFiles() {
-  const names = ['supabase-storage', 'storage-import', 'hosted-result-api', 'result-access', 'result-cleanup', 'song-reissue', 'audio-files', 'identifiers', 'lyria-restore', 'request-intake'];
+  const names = ['email-address','supabase-storage', 'storage-import', 'hosted-result-api', 'result-access', 'result-cleanup', 'song-reissue', 'audio-files', 'identifiers', 'lyria-restore', 'request-intake'];
   const entry = await readFile(new URL('../supabase/functions/nosayeon-result-api/index.ts', import.meta.url), 'utf8');
   return [{ name: 'index.ts', content: entry.replaceAll('../../../src/', './src/') },
     { name:'web/js/prompt-builder.mjs', content: await readFile(new URL('../web/js/prompt-builder.mjs',import.meta.url),'utf8') },

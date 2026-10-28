@@ -1,3 +1,4 @@
+import {validEmail} from './email-address.mjs';
 import {hashResultToken} from './identifiers.mjs';
 import {openResultToken,sealResultToken} from './notification-secret.mjs';
 import {reissueSong} from './song-reissue.mjs';
@@ -5,8 +6,10 @@ import {deliverResultNotifications} from './result-notifications.mjs';
 export async function processQueuedRestore({job,backend,restoreClient,mailer,key,origin}){
  let ready=false;
  try{
-  const recipient='dukedrum@gmail.com';
-  const token=openResultToken({sealedToken:job.sealed_token,key,songId:job.song_id,recipient,origin});
+  // The legacy transfer envelope is independent of the saved email destination.
+  const recipient=await backend.restoreRecipient?.(job.song_id);
+  if(mailer&&!validEmail(recipient))throw new Error('missing_restore_recipient');
+  const token=openResultToken({sealedToken:job.sealed_token,key,songId:job.song_id,recipient:'dukedrum@gmail.com',origin});
   if(await hashResultToken(token)!==job.token_hash)throw new Error('token_mismatch');
   const result=await reissueSong({backend,restoreClient,songId:job.song_id,tokenHash:job.token_hash,version:job.requested_version});
   if(result.result!=='ready')throw new Error('restore_failed');ready=true;

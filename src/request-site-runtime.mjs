@@ -1,16 +1,17 @@
 import {hasAccessSession,issueAccessCookie,passwordMatches,loginClientHash} from './site-access.mjs';
+import {validEmail} from './email-address.mjs';
 const encoder=new TextEncoder();
 const b64=bytes=>btoa(String.fromCharCode(...bytes)).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
 const unb64=value=>Uint8Array.from(atob(value.replace(/-/g,'+').replace(/_/g,'/')),c=>c.charCodeAt(0));
 const uuid=value=>typeof value==='string'&&/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/.test(value);
 const hash=async value=>[...new Uint8Array(await crypto.subtle.digest('SHA-256',encoder.encode(value)))].map(x=>x.toString(16).padStart(2,'0')).join('');
 async function cryptKey(value){if(!/^[A-Za-z0-9_-]{43}$/.test(value??''))throw new Error();return crypto.subtle.importKey('raw',unb64(value),'AES-GCM',false,['encrypt','decrypt']);}
-const aad=(id,origin)=>encoder.encode(JSON.stringify(['nosayeon-result-token-v1',id,'dukedrum@gmail.com',origin]));
-export async function sealRequestToken(token,id,key,origin){const iv=crypto.getRandomValues(new Uint8Array(12));const data=new Uint8Array(await crypto.subtle.encrypt({name:'AES-GCM',iv,additionalData:aad(id,origin)},await cryptKey(key),encoder.encode(token)));return ['v1',b64(iv),b64(data.slice(-16)),b64(data.slice(0,-16))].join('.');}
-export async function openRequestToken(sealed,id,key,origin){
+const aad=(id,origin,recipient)=>encoder.encode(JSON.stringify(['nosayeon-result-token-v1',id,recipient,origin]));
+export async function sealRequestToken(token,id,key,origin,recipient='dukedrum@gmail.com'){const iv=crypto.getRandomValues(new Uint8Array(12));const data=new Uint8Array(await crypto.subtle.encrypt({name:'AES-GCM',iv,additionalData:aad(id,origin,recipient)},await cryptKey(key),encoder.encode(token)));return ['v1',b64(iv),b64(data.slice(-16)),b64(data.slice(0,-16))].join('.');}
+export async function openRequestToken(sealed,id,key,origin,recipient='dukedrum@gmail.com'){
  if(!/^v1\.[A-Za-z0-9_-]{16}\.[A-Za-z0-9_-]{22}\.[A-Za-z0-9_-]{58}$/.test(sealed??''))throw new Error();
  const [,iv,tag,body]=sealed.split('.'),content=unb64(body),auth=unb64(tag),data=new Uint8Array(content.length+auth.length);data.set(content);data.set(auth,content.length);
- const token=new TextDecoder().decode(await crypto.subtle.decrypt({name:'AES-GCM',iv:unb64(iv),additionalData:aad(id,origin)},await cryptKey(key),data));
+ const token=new TextDecoder().decode(await crypto.subtle.decrypt({name:'AES-GCM',iv:unb64(iv),additionalData:aad(id,origin,recipient)},await cryptKey(key),data));
  if(!/^[A-Za-z0-9_-]{43}$/.test(token))throw new Error();return token;
 }
 export function createRequestSite({assets,origin,edgeBase,fetchImpl=fetch}){
@@ -46,7 +47,7 @@ export function createRequestSite({assets,origin,edgeBase,fetchImpl=fetch}){
   async function safeState(row){
    const state={id:row.id,status:row.status,errorCode:row.errorCode};
    if(uuid(row.songId)){
-    const token=await openRequestToken(row.sealedToken,row.id,env.REQUEST_ENCRYPTION_KEY,origin);
+    const token=await openRequestToken(row.sealedToken,row.id,env.REQUEST_ENCRYPTION_KEY,origin,row.recipient);
     const link=new URL('/result.html',origin);link.searchParams.set('id',row.songId);link.hash=new URLSearchParams({token}).toString();state.resultUrl=link.href;
    }
    return state;
@@ -98,12 +99,12 @@ export function createRequestSite({assets,origin,edgeBase,fetchImpl=fetch}){
    if(request.headers.get('Origin')!==origin)return json({error:'forbidden'},403);
    let length=0,chunks=[];for await(const chunk of request.body??[]){length+=chunk.length;if(length>24000)return json({error:'invalid_request'},413);chunks.push(chunk);}
    const bytes=new Uint8Array(length);let at=0;for(const chunk of chunks){bytes.set(chunk,at);at+=chunk.length;}
-   const body=JSON.parse(new TextDecoder().decode(bytes));if(!uuid(body.id)||typeof body.story!=='string'||!body.story.trim()||body.story.length>5000)return json({error:'invalid_request'},400);
+   const body=JSON.parse(new TextDecoder().decode(bytes));const recipient=typeof body.recipient==='string'?body.recipient.trim():'';if(!validEmail(recipient))return json({error:'invalid_recipient'},400);if(!uuid(body.id)||typeof body.story!=='string'||!body.story.trim()||body.story.length>5000)return json({error:'invalid_request'},400);
    const previous=await edge(`/intake/status?id=${body.id}`);
    if(previous.ok)return json(await safeState(await previous.json()));
    if(previous.status!==404)throw new Error();
    const token=b64(crypto.getRandomValues(new Uint8Array(32)));
-   const payload={id:body.id,story:body.story,options:body.options,tokenHash:await hash(token),sealedToken:await sealRequestToken(token,body.id,env.REQUEST_ENCRYPTION_KEY,origin)};
+   const payload={recipient,id:body.id,story:body.story,options:body.options,tokenHash:await hash(token),sealedToken:await sealRequestToken(token,body.id,env.REQUEST_ENCRYPTION_KEY,origin,recipient)};
    const r=await edge('/intake/submit',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
    const state=await r.json();if(!r.ok)return json({error:state.result||state.error||'unavailable'},r.status);
    return json({id:body.id,status:state.status});
