@@ -1,0 +1,45 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {readFile} from 'node:fs/promises';
+import {PGlite} from '@electric-sql/pglite';
+import {createHash,randomUUID} from 'node:crypto';
+const migrationNames=['20261026143658_private_audio_storage','20261026154303_result_link_access','20261026200705_single_download_cleanup','20261026203923_expired_audio_cleanup','20261026220530_stable_page_reissue','20261027224532_song_request_pipeline','20261028034241_request_recipient_email','20261028035241_request_limit_50','20261027233531_password_access_and_restore_queue','20261029071410_sequential_request_queue_eta'];
+test('many requests queue while one works; FIFO claims serialize original/restore jobs, estimates update, limits and pauses remain safe',async()=>{
+ const db=new PGlite();
+ try{
+  await db.exec('create role anon;create role authenticated;create role service_role bypassrls;create schema storage;create table storage.buckets(id text primary key,name text,public boolean,file_size_limit bigint,allowed_mime_types text[]);');
+  for(const name of migrationNames)await db.exec(await readFile(new URL(`../supabase/migrations/${name}.sql`,import.meta.url),'utf8'));
+  const rpc=async(name,args=[])=>(await db.query(`select public.${name}(${args.map((_,i)=>'$'+(i+1)).join(',')}) result`,args)).rows[0].result;
+  const ingress='b'.repeat(64),sealed='v1.'+'a'.repeat(16)+'.'+'b'.repeat(22)+'.'+'c'.repeat(58);
+  await db.query('insert into song_request_runtime(id,ingress_hash,enabled,worker_seen_at) values(true,$1,true,clock_timestamp())',[ingress]);
+  const args=()=>{const id=randomUUID();return [id,'fixture story',createHash('sha256').update(id).digest('hex'),sealed,ingress,'listener@example.com'];};
+  const first=args(),second=args(),third=args();
+  assert.equal((await rpc('submit_song_request_to_email',first)).result,'accepted');assert.equal((await rpc('claim_song_request')).id,first[0]);
+  assert.equal((await rpc('submit_song_request_to_email',second)).result,'accepted');assert.equal((await rpc('submit_song_request_to_email',third)).result,'accepted');
+  assert.equal((await rpc('submit_song_request_to_email',second)).result,'existing');
+  const secondState=await rpc('read_song_request',[second[0],ingress]),thirdState=await rpc('read_song_request',[third[0],ingress]);
+  assert.equal(secondState.queue.position,2);assert.equal(secondState.queue.ahead,1);assert.equal(thirdState.queue.position,3);assert.ok(thirdState.queue.estimatedSeconds>secondState.queue.estimatedSeconds);
+  assert.equal(await rpc('read_song_request',[third[0],'c'.repeat(64)]),null);
+  assert.equal(await rpc('claim_song_request'),null);assert.equal(await rpc('claim_queued_song_restore'),null);
+  await rpc('progress_song_request',[first[0],'completed',null,null]);
+  const advanced=await rpc('song_request_queue_state',[second[0]]);assert.equal(advanced.position,1);assert.ok(advanced.estimatedSeconds<secondState.queue.estimatedSeconds);
+  assert.equal((await rpc('claim_song_request')).id,second[0]);assert.equal(await rpc('claim_song_request'),null);
+  const songId=randomUUID();await db.query("insert into songs(id,google_interaction_id,generated_at,storage_status) values($1,$2,clock_timestamp(),'pending')",[songId,songId]);
+  const restore=(await db.query("insert into song_restore_queue(song_id,requested_version,token_hash,sealed_token,created_at) values($1,0,$2,$3,clock_timestamp()-interval '1 minute') returning id",[songId,'d'.repeat(64),sealed])).rows[0];
+  assert.equal(await rpc('claim_queued_song_restore'),null);
+  await rpc('progress_song_request',[second[0],'completed',null,null]);assert.equal(await rpc('claim_song_request'),null);
+  const restoration=await rpc('claim_queued_song_restore');assert.equal(restoration.id,restore.id);assert.equal(await rpc('claim_song_request'),null);
+  assert.equal(await rpc('finish_queued_song_restore',[restoration.id,restoration.claim_id,true]),true);
+  assert.equal((await rpc('claim_song_request')).id,third[0]);
+  const fourth=args();assert.equal((await rpc('submit_song_request_to_email',fourth)).result,'accepted');
+  await db.query("update song_requests set generation_reserved_at=clock_timestamp()-interval '21 minutes' where id=$1",[third[0]]);
+  const stalled=await rpc('song_request_queue_state',[fourth[0]]);assert.equal(stalled.paused,true);assert.equal(stalled.estimatedSeconds,null);assert.equal(await rpc('claim_song_request'),null);
+  await rpc('progress_song_request',[third[0],'failed',null,null]);assert.equal((await rpc('claim_song_request')).id,fourth[0]);await rpc('progress_song_request',[fourth[0],'completed',null,null]);
+  await db.query("insert into song_requests(id,prompt,token_hash,sealed_token,recipient,status) select gen_random_uuid(),'completed',md5('fixture'||i)||md5('token'||i),$1,'fixture@example.com','completed' from generate_series(1,46) i",[sealed]);
+  assert.equal((await rpc('submit_song_request_to_email',args())).result,'daily_limit');
+  await db.query("update song_request_runtime set worker_seen_at=clock_timestamp()-interval '2 minutes'");
+  assert.equal(await rpc('claim_song_request'),null);assert.equal((await rpc('submit_song_request_to_email',args())).result,'worker_unavailable');
+  assert.equal(await rpc('song_request_queue_state',[first[0]]),null);
+  assert.equal((await db.query("select has_function_privilege('anon','public.song_request_queue_state(uuid)','execute') allowed")).rows[0].allowed,false);
+ }finally{await db.close();}
+});

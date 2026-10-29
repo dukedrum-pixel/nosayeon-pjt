@@ -59,3 +59,17 @@ test('an open page recovers from missing password session without losing the sto
  await page.el('session-form').handlers.submit({preventDefault(){}});await page.flush();
  assert.equal(page.el('session-gate').hidden,true);assert.equal(page.el('submit-request').disabled,false);assert.equal(page.el('story').value,'작성 중인 사연');assert.equal(posts,0);assert.equal(page.el('session-password').value,'');
 });
+
+test('accepted requests show queue order and ETA, then update or pause without another submission',async()=>{
+ let status='accepted',queue={position:3,ahead:2,estimatedSeconds:300,paused:false},posts=0;
+ const page=setup(async(path,init)=>{
+  if(path.endsWith('/health'))return Response.json({enabled:true,workerReady:true});
+  if(init?.method==='POST'){posts++;return Response.json({status:'accepted'});}
+  return Response.json({status,queue});
+ });
+ await page.flush();await page.submit();await page.flush();
+ assert.equal(page.el('request-queue').hidden,false);assert.match(page.el('queue-position').textContent,/3번째.*2건/);assert.match(page.el('queue-estimate').textContent,/4~8분/);
+ queue={position:2,ahead:1,estimatedSeconds:null,paused:true};await page.run(3000);assert.match(page.el('queue-estimate').textContent,/지연/);
+ status='generating';queue={position:0,ahead:0,estimatedSeconds:60,paused:false};await page.run(3000);assert.match(page.el('queue-position').textContent,/만들고/);assert.match(page.el('queue-estimate').textContent,/1~2분/);
+ status='completed';queue=null;await page.run(3000);assert.equal(page.el('request-queue').hidden,true);assert.equal(posts,1);
+});

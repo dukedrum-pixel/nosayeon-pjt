@@ -19,7 +19,7 @@ test('request Site requires a password session, same-origin POST and selected re
  const handler=createRequestSite({origin,ownerId:'owner',edgeBase:'https://edge.example.com',assets:{},fetchImpl:async(url,init)=>{
   assert.equal(init.headers['x-request-secret'],'i'.repeat(43));
   if(url.includes('/health'))return Response.json({enabled:true,workerReady:true});
-  if(url.includes('/status'))return submissions?Response.json({id,status:'generating'}):new Response(null,{status:404});
+  if(url.includes('/status'))return submissions?Response.json({id,status:'generating',queue:{position:2,ahead:1,estimatedSeconds:240,paused:false,otherRecipient:'must-not-leak'}}):new Response(null,{status:404});
   submissions++;const body=JSON.parse(init.body);assert.equal(body.recipient,recipient);assert.equal(body.token,undefined);assert.ok(body.sealedToken);return Response.json({status:'accepted'});
  }});
  const env={REQUEST_INGRESS_KEY:'i'.repeat(43),REQUEST_ENCRYPTION_KEY:key,SITE_PASSWORD:'fixture-password',SITE_SESSION_KEY:key};
@@ -29,6 +29,7 @@ test('request Site requires a password session, same-origin POST and selected re
  assert.equal((await handler.fetch(submit({Origin:'https://wrong.example.com'}),env)).status,403);
  for(const bad of ['', 'not-an-email', 'ok@example.com\r\nBcc: other@example.com'])assert.equal((await handler.fetch(submit({},bad),env)).status,400);
  assert.equal((await handler.fetch(submit(),env)).status,200);assert.equal((await handler.fetch(submit(),env)).status,200);assert.equal(submissions,1);
+ const resumed=await (await handler.fetch(submit(),env)).json();assert.equal(resumed.queue.position,2);assert.equal(resumed.queue.estimatedSeconds,240);assert.doesNotMatch(JSON.stringify(resumed),/must-not-leak/);
  const health=extra=>new Request(origin+'/api/request/health',{headers:extra});
  assert.equal((await handler.fetch(health({'oai-authenticated-user-id':'pairwise-site-visitor'}),env)).status,401);
  assert.equal((await handler.fetch(health({Cookie:cookie}),env)).status,200);

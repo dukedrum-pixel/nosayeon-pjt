@@ -5,9 +5,9 @@
 - 신청 주소: https://nosayeon-result-check.cw-lee.chatgpt.site
 - 이름: 노사연 · 사연을 노래로
 - Site ID: `appgprj_6ae116663f34819191c39fbf636cea68`
-- Site 소스: `f1617afb638c39c5dea22fba29228f82cdbd2aa6`
-- 배포: `appgdep_6ae1c093e850819193998f6093320ce9`, succeeded, 환경 revision 2
-- 버전: `appgprj_6ae116663f34819191c39fbf636cea68~appgver_1b354f62b0b0819198916108cbfd48ac`
+- Site 소스: `b5e8cfee48e624f2dd0bad6415518f753f5746cd`
+- 배포: `appgdep_6ae2f2c1d6b48191851626f7c368d9c2`, succeeded, 환경 revision 2
+- 버전: `appgprj_6ae116663f34819191c39fbf636cea68~appgver_34d90abcb7c88191a62f95535f378f66`
 - Supabase Edge Function: `nosayeon-result-api`, version 4, ACTIVE
 - 마이그레이션: `20261027224532 / song_request_pipeline`
 
@@ -133,3 +133,17 @@ docker inspect --format '{{.State.Status}} restart={{.HostConfig.RestartPolicy.N
 실제 DB enabled=true/worker_ready=true, 같은 Site Worker→실제 Edge health HTTP 200을 확인했다. 실제 Site 로그에도 /api/request/health 연속 200이 기록됐다. 소스/SQL/배포 정책은 변경하지 않았다. 상시 호스팅을 새로 구축한 것이 아니며 관리 환경의 연결/인증에 의존한다.
 
 현재 신규 신청 구조는 한 건이 accepted/generating/saving/notifying이면 다른 신규 접수를 busy로 거절한다. DB에 큐 테이블은 있지만 다수 신규 신청을 대기시키는 접수 정책은 아니다. 작업자 한 개가 한 작업을 끝내고 다음 작업을 읽으므로 병렬 생성도 아니다. 기존 곡 복구는 별도 대기열로 접수되고 작업자가 우선 처리한다. 결과 페이지 감상/다운로드 HTTP 요청은 음악 생성 작업자와 별개다. 사용자가 구조를 질문한 것이므로 신규 접수를 다수 대기열 방식으로 임의 변경하지 않았다.
+
+## 최신: 복수 신청 대기열과 예상 시간 — 2026-10-29
+
+사용자가 복수 신청을 대기열로 접수해 순차 처리하도록 요청했다. 기존 한 건 활성 시 busy로 거절하는 정책을 대체한다. `20261029071410_sequential_request_queue_eta.sql`을 적용했다. 신규/기존 접수 RPC의 busy 제한을 제거하고 최근 24시간 50회·중복 번호 멱등 처리·workerReady 제한은 유지했다.
+
+신규/복구 claimer는 공통 runtime 행 잠금과 활성 작업 검사로 한 작업씩만 배정한다. 양쪽 대기열의 created_at/ID를 비교해 먼저 접수된 작업부터 처리한다. 오래된 복구 우선 처리 설명은 과거 상태다. 기존 단일 작업자 코드는 그대로 사용할 수 있어 작업자를 재시작하지 않았다.
+
+서비스 전용 song_request_queue_state RPC와 내부 상태 조회로 내 순서·앞선 건수·예상 초를 계산한다. 최근 완료 20건 평균에 30% 여유를 주고 건당 60~600초로 제한, 표본이 없으면 180초다. 대기·실행 중인 신규/복구를 반영한다. 화면은 0.75~1.5배의 분 단위 범위로 표시하고 3초 조회마다 갱신한다. 다른 신청의 ID/이메일/사연/암호문을 고객에게 전달하지 않는다.
+
+worker heartbeat가 없거나 실행 중 작업이 20분 넘으면 예상 시간은 null/paused가 되고 UI에 지연 안내를 표시한다. 실패/결과 불명 작업을 자동 재생성/재발송하거나 기존 실패 건을 재접수하지 않는다. 중단 건의 수동 복구·운영 알림은 후속 작업이다.
+
+전체 143개 통과. 실제 DB에서 생성 중 추가 두 건 접수·동시 claim 거부·대기 순서/예상 값·FIFO 배정을 검증하고 롤백했다. 검증 데이터 0건, 추가 음악/메일 없음, worker_ready=true 확인. Site 배포 succeeded. Edge v4는 기존 내부 조회 응답을 전달하므로 재배포하지 않았다. 새 화면은 결과 시간 안내의 자동 테스트/DB 계약으로 검증했으며 배포 사이트의 브라우저 조작 검증을 완료했다고 주장하지 않는다.
+
+작업 일지 [WORK_LOG.md](WORK_LOG.md)에 TODO/진행 중/완료 및 릴리즈 후속 과제를 정리했다. 이후 작업 때 해당 파일을 함께 갱신한다.

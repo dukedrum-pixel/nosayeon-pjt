@@ -48,6 +48,11 @@ export function createRequestSite({assets,origin,edgeBase,fetchImpl=fetch}){
   }
   async function safeState(row){
    const state={id:row.id,status:row.status,errorCode:row.errorCode};
+   const queue=row.queue;
+   if(queue&&Number.isInteger(queue.position)&&queue.position>=0&&Number.isInteger(queue.ahead)&&queue.ahead>=0){
+    state.queue={position:queue.position,ahead:queue.ahead,paused:queue.paused===true,
+     estimatedSeconds:Number.isInteger(queue.estimatedSeconds)&&queue.estimatedSeconds>0?queue.estimatedSeconds:null};
+   }
    if(uuid(row.songId)){
     const token=await openRequestToken(row.sealedToken,row.id,env.REQUEST_ENCRYPTION_KEY,origin,row.recipient);
     const link=new URL('/result.html',origin);link.searchParams.set('id',row.songId);link.hash=new URLSearchParams({token}).toString();state.resultUrl=link.href;
