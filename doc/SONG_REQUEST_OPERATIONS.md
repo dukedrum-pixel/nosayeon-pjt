@@ -123,3 +123,13 @@ docker inspect --format '{{.State.Status}} restart={{.HostConfig.RestartPolicy.N
 재신청 버튼은 은은한 베이지 배경, 명확한 테두리와 짙은 글자, 48px 최소 높이를 적용했다. 주 다운로드 버튼보다 차분하게 유지하면서 hover/active/focus/disabled 상태를 구분한다.
 
 `test/result-page-actions.test.mjs`는 가짜 음원/API로 다운로드→사용 완료→재신청 POST 1회→처리 중→자동 조회 준비 완료를 재현하고 오래된 문구 제거·새 완료 안내·다운로드 버튼 활성화를 확인한다. 전체 테스트 140개 통과, 배포 succeeded. SQL/Edge/작업자는 바꾸지 않았고 실제 고객 음원 다운로드·복구·음악 생성·메일 발송은 하지 않았다. 업데이트를 보려면 기존 결과 페이지를 새로고침한다.
+
+## 2026-10-29 작업자 연결 복구 및 동시 접수 설명
+
+사용자는 이전 실패 건은 건너뛰고 신청 페이지를 다시 사용할 수 있게 하라고 지시했다. 실패 신청 e606db27-0c26-44f5-854b-4ddffec620e7은 failed/audio_base64_stack_overflow로 보존하고 재생성·복구·재발송하지 않았다.
+
+2026-10-29 06:54 UTC(한국 15:54) 확인 시 worker_seen_at이 전날 20:45 UTC에 멈춰 있었고, 컨테이너가 시작 실패/재시작을 반복했다. 현재 호스트의 동일 관리 인증으로 Gmail 확인은 성공했으나 기존 컨테이너의 외부 HTTPS GET은 TimeoutError였다. 활성 신청/복구가 없음을 확인한 후 기존 컨테이너를 제거하고 현재 Docker 프록시 기본값과 CA 마운트로 다시 만들었다. 새 컨테이너는 Gmail 확인과 heartbeat에 성공했고 restart=0/running이었다. 컨테이너 연결 설정의 구체적인 어떤 항목이 바뀌었는지까지 확정하지 않는다.
+
+실제 DB enabled=true/worker_ready=true, 같은 Site Worker→실제 Edge health HTTP 200을 확인했다. 실제 Site 로그에도 /api/request/health 연속 200이 기록됐다. 소스/SQL/배포 정책은 변경하지 않았다. 상시 호스팅을 새로 구축한 것이 아니며 관리 환경의 연결/인증에 의존한다.
+
+현재 신규 신청 구조는 한 건이 accepted/generating/saving/notifying이면 다른 신규 접수를 busy로 거절한다. DB에 큐 테이블은 있지만 다수 신규 신청을 대기시키는 접수 정책은 아니다. 작업자 한 개가 한 작업을 끝내고 다음 작업을 읽으므로 병렬 생성도 아니다. 기존 곡 복구는 별도 대기열로 접수되고 작업자가 우선 처리한다. 결과 페이지 감상/다운로드 HTTP 요청은 음악 생성 작업자와 별개다. 사용자가 구조를 질문한 것이므로 신규 접수를 다수 대기열 방식으로 임의 변경하지 않았다.
