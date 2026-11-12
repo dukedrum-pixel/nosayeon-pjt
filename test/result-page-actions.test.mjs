@@ -9,7 +9,7 @@ class Element{
  addEventListener(name,fn){this.handlers[name]=fn;}
  removeAttribute(){} pause(){} load(){} remove(){} append(){} replaceChildren(){} click(){}
 }
-test('download then queued restore replaces consumed/preparing messages when polling finds the new version',async()=>{
+for(const unavailable of [false,true])test((unavailable?'offline restore explains no admission without retry: ':'')+'download then queued restore replaces consumed/preparing messages when polling finds the new version',async()=>{
  const elements=new Map(),timers=new Map();let sequence=0,phase='available',version=0,restores=0,downloads=0;
  const el=selector=>{if(!elements.has(selector))elements.set(selector,new Element());return elements.get(selector);};
  const body=Buffer.from('audio fixture');
@@ -21,7 +21,7 @@ test('download then queued restore replaces consumed/preparing messages when pol
  setTimeout(fn,ms){const id=++sequence;timers.set(id,{fn,ms});return id;},clearTimeout(id){timers.delete(id);},
  fetch:async path=>{
   if(path.startsWith('/api/download')){downloads++;phase='consumed';return new Response(body,{headers:{'Content-Type':'audio/mpeg','Content-Length':String(body.length)}});}
-  if(path.startsWith('/api/restore')){restores++;phase='processing';return Response.json(state(),{status:202});}
+  if(path.startsWith('/api/restore')){restores++;if(unavailable)return Response.json({status:'worker_unavailable'},{status:503});phase='processing';return Response.json(state(),{status:202});}
   return Response.json(state(),{status:phase==='available'?200:phase==='processing'?409:410});
  }};
  vm.runInNewContext(source,context);
@@ -30,6 +30,7 @@ test('download then queued restore replaces consumed/preparing messages when pol
  await el('#result-download').handlers.click();await flush();
  assert.match(el('#download-message').textContent,/사용 완료/);assert.equal(el('#result-restore').disabled,false);
  await el('#result-restore').handlers.click();await flush();
+ if(unavailable){assert.match(el('#restore-message').textContent,/아직 접수되지/);assert.equal(restores,1);assert.equal(el('#result-restore').disabled,false);assert.equal([...timers.values()].some(v=>v.ms===3000),false);return;}
  assert.equal(el('#download-message').textContent,'');assert.match(el('#restore-message').textContent,/준비하고/);
  phase='available';version=1;
  const poll=[...timers.entries()].find(([,v])=>v.ms===3000);assert.ok(poll);timers.delete(poll[0]);await poll[1].fn();await flush();

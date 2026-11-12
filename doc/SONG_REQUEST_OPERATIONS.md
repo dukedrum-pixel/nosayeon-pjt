@@ -5,10 +5,10 @@
 - 신청 주소: https://nosayeon-result-check.cw-lee.chatgpt.site
 - 이름: 노사연 · 사연을 노래로
 - Site ID: `appgprj_6ae116663f34819191c39fbf636cea68`
-- Site 소스: `b5e8cfee48e624f2dd0bad6415518f753f5746cd`
-- 배포: `appgdep_6ae2f2c1d6b48191851626f7c368d9c2`, succeeded, 환경 revision 2
-- 버전: `appgprj_6ae116663f34819191c39fbf636cea68~appgver_34d90abcb7c88191a62f95535f378f66`
-- Supabase Edge Function: `nosayeon-result-api`, version 4, ACTIVE
+- Site 소스: `5de211a0717506fac86e5b8745ef88071bb7e363`
+- 배포: `appgdep_6af5d3e5ce188191910851365ab5edba`, succeeded, 환경 revision 2
+- 버전: `appgprj_6ae116663f34819191c39fbf636cea68~appgver_902ad3da6f98819183d7b5cb8eaa16e3`
+- Supabase Edge Function: `nosayeon-result-api`, version 5, ACTIVE
 - 마이그레이션: `20261027224532 / song_request_pipeline`
 
 사용자는 신규 사연을 입력하고 신청하면 실제 음악이 생성되고 dukedrum@gmail.com으로 결과 페이지 링크가 전송되며 음악 재생·다운로드가 되는 수준까지 진행하라고 명시적으로 승인했다. 기존 복구를 신규 생성으로 대체하는 금지는 유지한다. 이번 신규 생성은 기존 곡 복구와 별개다.
@@ -157,3 +157,13 @@ worker heartbeat가 없거나 실행 중 작업이 20분 넘으면 예상 시간
 실제 DB 트랜잭션에서 유지 중인 결과 링크의 재신청 queued와 새 신청 accepted를 확인한 뒤 모두 롤백했다. 검증 신청 데이터는 0건이다. 검증용 실제 음악 생성/메일 발송/다운로드 소비는 없었다. 사용자가 건너뛰라고 한 실패 건을 재생성·복구하지 않았다. 이번 변경은 런타임 복구이고 UI/Edge/SQL 정책은 바꾸지 않았다.
 
 같은 유형의 개발 환경 의존 장애가 반복되므로 상시 작업자 호스팅을 WORK_LOG.md의 최우선 릴리즈 과제로 올렸다. 현재 복구를 환경 중지와 무관한 24시간 가용성 확보로 해석하지 않는다. 연결이 바뀐 뒤 기존 컨테이너는 재시작만으로 정상화되지 않을 수 있다.
+
+## 2026-11-12 재신청 중단과 원인 안내 개선
+
+기존 개발 작업자가 시작 실패를 반복해 heartbeat가 11월 7일 이후 끊겼다. Site 재신청 POST는 503, 결과 조회 410(사용 완료)이었고 새로운 복구 대기 건은 없었다. 현재 호스트의 Gmail 인증과 관리 환경 readiness를 확인하고 기존 컨테이너를 재생성해 running/restarts=0, worker_ready=true로 복구했다. 상시 호스팅 전환은 아직 하지 않았다.
+
+화면의 재신청 기한과 일치하는 곡 f73ed10d-9c49-4e95-9bb5-69c97ead177d(최초 생성 2026-10-28 03:59:47 UTC)을 Google GET으로 조회해 원본 크기/해시 일치를 확인했다(2,947,094바이트). 파일 저장·다운로드 소비·새 생성·메일은 하지 않았다. 해당 곡 재신청 RPC의 queued 응답은 트랜잭션으로 확인 후 롤백했다. 사용자가 다시 버튼을 눌러야 실제 접수된다.
+
+Edge v5는 worker_unavailable 결과를 일반 restore_failed와 구분해 반환한다. 결과 UI는 이를 '처리 서버 연결이 끊겨 아직 접수되지 않음'으로 안내하고, 입장 세션 만료도 별도 안내한다. 재신청 POST 자동 반복은 하지 않는다. 미접수 상태에서 준비 완료처럼 표시하지 않는다.
+
+전체 145개 통과. 서버 미가동 응답 전달, 접수 거부 안내, 자동 POST 미반복, 정상 재신청 완료 전환을 검사했다. Sites 배포 succeeded. 현재 수정은 런타임 복구와 원인 안내 보완이며 반복 중단의 근본 원인인 개발 환경 의존을 해결한 것으로 보고하지 않는다. WORK_LOG의 상시 작업자 호스팅을 최우선으로 유지한다.

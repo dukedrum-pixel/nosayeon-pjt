@@ -19,7 +19,7 @@ let token = new URLSearchParams(sourceUrl.hash.slice(1)).get('token');
 // Fragments are not sent in HTTP requests or Referer; never log this URL.
 let snapshot = null, blobUrl = null, expiryTimer = null, audioPending = null, downloadPending = null;
 let downloading = false;
-let restoring=false,pollTimer=null,restoreFromVersion=null;
+let restoring=false,pollTimer=null,restoreFromVersion=null,restoreError=null;
 
 function clearAudio() {
   player.pause(); player.removeAttribute('src'); player.load();
@@ -38,7 +38,7 @@ function render(value) {
     downloadMessage.textContent='';
     const restored=restoreFromVersion!==null&&(value.deliveryVersion??0)>restoreFromVersion;
     restoreMessage.textContent=restored?'같은 음악이 다시 준비되었습니다. 다시 듣거나 다운로드할 수 있어요.':'';
-    if(restored)restoreFromVersion=null;
+    if(restored){restoreFromVersion=null;restoreError=null;}
   }else if(view.status==='processing'){
     downloadMessage.textContent='';
     if(restoreFromVersion===null&&Number.isInteger(value.deliveryVersion))restoreFromVersion=value.deliveryVersion;
@@ -47,6 +47,8 @@ function render(value) {
     restoreMessage.textContent=restoreFromVersion!==null&&['consumed','expired','restore_failed','error'].includes(view.status)
       ?'재신청을 완료하지 못했습니다. 현재 상태를 확인한 뒤 직접 다시 신청해 주세요.':'';
   }
+  if(restoreError==='worker_unavailable'&&view.status!=='processing')restoreMessage.textContent='처리 서버 연결이 끊겨 재신청이 아직 접수되지 않았어요. 잠시 후 버튼을 눌러 다시 신청해 주세요.';
+  if(restoreError==='unauthorized'&&view.status!=='processing')restoreMessage.textContent='입장 시간이 만료됐어요. 이 페이지를 새로고침하고 비밀번호를 입력해 주세요.';
   updateResultStatus(view.status);
   document.querySelector('#result-heading').textContent = view.heading;
   document.querySelector('#result-message').textContent = view.message;
@@ -121,7 +123,7 @@ play.addEventListener('click', async () => {
 
 download.addEventListener('click', async () => {
   if (downloading||restoring || buildResultView(snapshot).status !== 'available') return;
-  restoreFromVersion=null;restoreMessage.textContent='';
+  restoreFromVersion=null;restoreError=null;restoreMessage.textContent='';
   downloading = true; download.disabled = true; restore.disabled = true; play.disabled = true; select.disabled = true;
   audioPending?.abort(); clearAudio();
   const controller = new AbortController(); downloadPending = controller;
@@ -162,11 +164,15 @@ download.addEventListener('click', async () => {
 
 restore.addEventListener('click',async()=>{
   if(restoring||downloading||!buildResultView(snapshot).showRestore)return;
-  const version=snapshot.deliveryVersion??0;restoreFromVersion=version;restoring=true;
+  const version=snapshot.deliveryVersion??0;restoreFromVersion=version;restoreError=null;restoring=true;
   audioPending?.abort();clearAudio();downloadMessage.textContent='';
   render({status:'processing',deliveryVersion:version});
   try{
-    await fetch(api(`/api/restore?id=${encodeURIComponent(id)}&version=${version}`),{method:'POST',headers:{Authorization:`Bearer ${token}`},credentials:'same-origin',cache:'no-store',redirect:'error',signal:AbortSignal.timeout(600000)});
+    const response=await fetch(api(`/api/restore?id=${encodeURIComponent(id)}&version=${version}`),{method:'POST',headers:{Authorization:`Bearer ${token}`},credentials:'same-origin',cache:'no-store',redirect:'error',signal:AbortSignal.timeout(600000)});
+      if(!response.ok){const data=await response.json();
+      if(data.status==='worker_unavailable')restoreError='worker_unavailable';
+      else if(response.status===401&&data.error==='unauthorized')restoreError='unauthorized';
+    }
   }catch{}
   finally{
     restoring=false;await load();

@@ -49,3 +49,11 @@ test('hosted playback preserves download permission; download consumes once and 
  assert.equal((await handler(request(`/api/download?id=${id}&version=0`,{method:'POST',headers:auth}))).status,410);
  assert.equal(claims,1);
 });
+
+test('offline worker is distinguished from a failed audio restore and does not enqueue twice',async()=>{
+ const id='11111111-1111-4111-8111-111111111111';let calls=0;
+ const backend={resultLink:async()=>({song_id:id,page_issued:true,delivery_version:0,consumed_at:new Date().toISOString(),songs:{generated_at:new Date().toISOString()}}),enqueueRestore:async()=>{calls++;return {result:'worker_unavailable'};}};
+ const handle=createHostedResultApi({backend,origin,queueRestores:true});
+ const response=await handle(request(`/api/restore?id=${id}&version=0`,{method:'POST',headers:{Authorization:'Bearer '+'a'.repeat(43)}}));
+ assert.equal(response.status,503);assert.equal((await response.json()).status,'worker_unavailable');assert.equal(calls,1);
+});

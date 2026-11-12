@@ -34,6 +34,7 @@ export function createResultHandler({ backend, restoreClient, requestRestore = r
         if(['busy','stale'].includes(result.result))return json({status:result.result},409);
         if(result.result==='retention_ended')return json({status:'retention_ended',canRestore:false},410);
         if(result.result==='invalid_link')return json({status:'invalid_link'},401);
+        if(result.result==='worker_unavailable')return json({status:'worker_unavailable',...common},503);
         return json({status:'restore_failed',...common},503);
       }
       if(await backend.hasQueuedRestore?.(id))return json({status:'processing',...common,canRestore:false},409);
