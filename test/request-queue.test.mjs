@@ -17,6 +17,8 @@ test('many requests queue while one works; FIFO claims serialize original/restor
   assert.equal((await rpc('submit_song_request_to_email',first)).result,'accepted');assert.equal((await rpc('claim_song_request')).id,first[0]);
   assert.equal((await rpc('submit_song_request_to_email',second)).result,'accepted');assert.equal((await rpc('submit_song_request_to_email',third)).result,'accepted');
   assert.equal((await rpc('submit_song_request_to_email',second)).result,'existing');
+  // PGlite's clock can tie within one millisecond; establish explicit FIFO fixture times.
+  await db.query("update song_requests set created_at=clock_timestamp()-case when id=$1 then interval '2 seconds' else interval '1 second' end where id in ($1,$2)",[second[0],third[0]]);
   const secondState=await rpc('read_song_request',[second[0],ingress]),thirdState=await rpc('read_song_request',[third[0],ingress]);
   assert.equal(secondState.queue.position,2);assert.equal(secondState.queue.ahead,1);assert.equal(thirdState.queue.position,3);assert.ok(thirdState.queue.estimatedSeconds>secondState.queue.estimatedSeconds);
   assert.equal(await rpc('read_song_request',[third[0],'c'.repeat(64)]),null);

@@ -110,3 +110,13 @@ Edge v5는 worker_unavailable 결과를 일반 restore_failed와 구분해 반�
 사용자 요청으로 관리 환경 시작 완료를 기다린 후 확인했다. DB는 응답하지만 heartbeat가 2026-11-12 23:06 UTC에 멈춰 있었고, 기존 컨테이너가 시작 실패/재시작을 반복했다. 신청 completed=10/failed=1, 복구 succeeded=9로 활성 작업이 없었다. 현재 관리 환경의 인증 준비 상태 및 호스트 Gmail 인증이 정상이었다.
 
 기존 컨테이너를 제거한 뒤 현재 프록시/CA/환경 바인딩으로 재생성했다. running/restarts=0, 실제 Edge health HTTP 200/enabled=true/workerReady=true, DB heartbeat 2026-11-22 14:56 UTC 갱신을 확인했다. 제품 소스·SQL·Site 배포는 변경하지 않았다. 실패 건 재처리·테스트 신규 생성·실제 메일·다운로드 소비는 하지 않았다. 상시 호스팅 전환은 여전히 최우선 미완료 과제다.
+
+## 최신 2026-11-23: 원인 증거 확보 + 관리자 실제 배포
+
+[OPERATIONS_DASHBOARD.md](OPERATIONS_DASHBOARD.md), [WORKER_OUTAGE_DIAGNOSIS.md](WORKER_OUTAGE_DIAGNOSIS.md)를 먼저 읽는다. 기존/현재 Docker 프록시 주소가 실제로 달랐음을 확인했고, 재생성 후 일치·정상 상태가 됐다. 상시 호스팅 전환은 아직 아니다.
+
+새 owner-private 관리자 Site nosayeon-admin을 배포했다. 소유자 1명/그룹 0 유지, 고객 사이트 public 접근과 혼동하지 않는다. 새 관리자 ID/원점은 config/admin-site.json에 있다. Site 재생성 금지. 기존 고객 Site는 변경하지 않았다. Edge API는 v6, operations_dashboard 마이그레이션 20261123041000까지 적용했다. 관리자 키는 Sites Secret 및 Git 제외 runtime.json의 adminKey에만 존재하며 원문 출력 금지.
+
+관리자는 조회 전용으로 신청·대기열·상세·오류·진단·메일·저장소가 연결돼 있다. 직접 재생성/메일/큐 수정/접수 제어 버튼은 아직 제공하지 않는다. 148개 통과, 같은 Worker와 실제 Edge 데이터로 Chromium 데스크톱/390px·조회 실패 처리를 확인했다. 플랫폼 실제 로그인 흐름은 테스트하지 않았으며 native 도구로 owner-private·배포 성공을 확인했다.
+
+새 작업자는 시작 단계와 안전한 오류 코드를 기록하고 가능한 경우 song_worker_events에 보관한다. DB 연결 자체가 끊긴 경우 로컬 로그가 필요하다. scripts/diagnose-request-worker.mjs는 주소/환경 값 노출 없이 기존/현재 프록시 차이를 확인한다. 운영 조치 때 활성 작업을 먼저 확인하고 실패/불명 건의 자동 새 생성·재발송을 금지한다.

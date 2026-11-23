@@ -43,6 +43,7 @@ export async function processSongRequest({job,backend,client,mailer,key,origin,w
   const state=stage==='notifying'?'mail_unknown':attempted&&!interaction?'unknown':'failed';
   try{await backend.progressRequest(job.id,state,interaction,songId);}catch{}
   const http=/HTTP (\d{3})/.exec(error?.message??'');
+  try{await backend.recordWorkerEvent?.({kind:'request_failed',phase,code:['http_error','network_error','content_mismatch','invalid_response','local_error'].includes(error?.code)?error.code:'processing_failed',requestId:job.id,httpStatus:http?Number(http[1]):null});}catch{}
   return {requestId:job.id,status:state,songId,stage,phase,errorType:['Error','RangeError','TypeError','SpikeError','StorageError'].includes(error?.name)?error.name:'Error',errorCode:['http_error','network_error','content_mismatch','invalid_response','local_error'].includes(error?.code)?error.code:'processing_failed',providerHttpStatus:http?Number(http[1]):null};
  }
 }
